@@ -67,7 +67,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // Generate comment based on rating
                 setTimeout(() => {
-                    const comment = translations.comments[rating];
+                    const commentsArray = translations.comments[rating];
+                    const randomIndex = Math.floor(Math.random() * commentsArray.length);
+                    const comment = commentsArray[randomIndex];
                     loadingDiv.style.display = 'none';
                     resultDiv.style.display = 'block';
                     resultDiv.innerHTML = `

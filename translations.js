@@ -8,6 +8,8 @@ const translations = {
     goToYoutube: "Please go to a YouTube video page.",
     error: "An error occurred. Please try again.",
     success: "Comment was successfully placed in the comments field.",
+    confirmSuccess: "Comment posted successfully!",
+    previewSuccess: "Your comment preview is ready. If satisfied, click ‘Comment’.",
     previewButton: "Preview Comment",
     comments: {
         1: [

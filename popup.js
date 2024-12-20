@@ -94,7 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         }, (postResponse) => {
                             hideLoading();
                             if (postResponse && postResponse.success) {
-                                showMessage(translations.success, 'success');
+                                showMessage(translations.confirmSuccess || 'Comment posted successfully!', 'success');
                             }
                         });
                     });
@@ -108,7 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         }, (postResponse) => {
                             hideLoading();
                             if (postResponse && postResponse.success) {
-                                showMessage(translations.success, 'success');
+                                showMessage(translations.previewSuccess || 'Preview successful!', 'success');
                             }
                         });
                     });

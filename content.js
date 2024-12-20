@@ -18,37 +18,37 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 function postCommentToYoutube(comment) {
     return new Promise(async (resolve, reject) => {
         try {
-            // اسکرول به بخش کامنت‌ها
+            // Scroll to comments section
             const commentsSection = document.querySelector('#comments');
             if (!commentsSection) {
                 throw new Error('Comments section not found');
             }
             commentsSection.scrollIntoView({ behavior: 'smooth' });
             
-            // صبر برای لود شدن کامل بخش کامنت‌ها
+            // Wait for comments section to load completely
             await new Promise(resolve => setTimeout(resolve, 2000));
 
-            // کلیک روی باکس کامنت
+            // Click on comment box
             const commentBox = document.querySelector('#simplebox-placeholder');
             if (!commentBox) {
                 throw new Error('Comment box not found');
             }
             commentBox.click();
 
-            // صبر برای باز شدن باکس کامنت
+            // Wait for comment box to open
             await new Promise(resolve => setTimeout(resolve, 1500));
 
-            // پیدا کردن و پر کردن فیلد کامنت
+            // Find and fill the comment field
             const commentInput = document.querySelector('#contenteditable-root');
             if (!commentInput) {
                 throw new Error('Comment input field not found');
             }
 
-            // وارد کردن متن کامنت
+            // Enter comment text
             commentInput.focus();
             commentInput.textContent = comment;
             
-            // شبیه‌سازی تایپ کردن
+            // Simulate typing
             const inputEvent = new InputEvent('input', {
                 bubbles: true,
                 cancelable: true,
@@ -56,10 +56,10 @@ function postCommentToYoutube(comment) {
             });
             commentInput.dispatchEvent(inputEvent);
 
-            // صبر برای فعال شدن دکمه ثبت
+            // Wait for submit button to be enabled
             await new Promise(resolve => setTimeout(resolve, 1000));
 
-            // کلیک روی دکمه ثبت
+            // Click on submit button
             const submitButton = document.querySelector('#submit-button');
             if (!submitButton) {
                 throw new Error('Submit button not found');

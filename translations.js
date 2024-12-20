@@ -1,5 +1,5 @@
 const translations = {
-    title: "✨ EasyComment",
+    title: "✨ Easy Comment",
     ratingLabel: "Your Rating",
     generateButton: "Generate Comment",
     loading: "Generating smart comment...",

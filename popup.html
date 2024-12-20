@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="fa">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            width: 300px;
+            padding: 15px;
+            font-family: Tahoma, Arial, sans-serif;
+        }
+        
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .rating-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .stars {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .star {
+            font-size: 24px;
+            cursor: pointer;
+        }
+        
+        .star.selected {
+            color: gold;
+        }
+        
+        button {
+            background-color: #ff0000;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        button:hover {
+            background-color: #cc0000;
+        }
+        
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        
+        #result {
+            margin-top: 10px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            min-height: 50px;
+            display: none;
+        }
+
+        #confirmComment {
+            background-color: #4CAF50 !important;
+        }
+
+        #confirmComment:hover {
+            background-color: #45a049 !important;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 10px 0;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            margin: 0 auto;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>تولید کامنت هوشمند</h2>
+        
+        <div class="rating-container">
+            <label for="rating">امتیاز شما به ویدیو:</label>
+            <div class="stars">
+                <span class="star">&#9733;</span>
+                <span class="star">&#9733;</span>
+                <span class="star">&#9733;</span>
+                <span class="star">&#9733;</span>
+                <span class="star">&#9733;</span>
+            </div>
+        </div>
+        
+        <button id="generateComment">تولید کامنت</button>
+        
+        <div class="loading">
+            <div class="spinner"></div>
+            <div style="margin-top: 10px;">در حال تولید کامنت...</div>
+        </div>
+
+        <div id="result"></div>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="popup.js"></script>
+</body>
+</html>

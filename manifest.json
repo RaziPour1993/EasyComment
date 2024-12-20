@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "YouTube Comment Generator",
   "version": "1.0",
-  "description": "تولید کامنت برای ویدیوهای یوتیوب",
+  "description": "Generate smart comments for YouTube videos",
   "permissions": [
     "activeTab",
     "scripting",

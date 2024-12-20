@@ -73,12 +73,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     loadingDiv.style.display = 'none';
                     resultDiv.style.display = 'block';
                     resultDiv.innerHTML = `
-                        <div style="font-size: 16px; line-height: 1.6;">${comment}</div>
+                        <div style="font-size: 16px; line-height: 1.2; margin-bottom: 20px;">${comment}</div>
                         <div style="display: flex; gap: 10px;">
-                            <button id="confirmComment" style="flex: 1;">
+                            <button id="confirmComment" style="flex: 1; background: var(--confirm-button-color);">
                                 <span>${translations.confirmButton}</span>
                             </button>
-                            <button id="previewComment" style="flex: 1; background: linear-gradient(145deg, #9C27B0, #7B1FA2);">
+                            <button id="previewComment" style="flex: 1; background: var(--preview-button-color);">
                                 <span>${translations.previewButton}</span>
                             </button>
                         </div>

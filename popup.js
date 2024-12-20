@@ -72,16 +72,34 @@ document.addEventListener('DOMContentLoaded', () => {
                     resultDiv.style.display = 'block';
                     resultDiv.innerHTML = `
                         <div style="font-size: 16px; line-height: 1.6;">${comment}</div>
-                        <button id="confirmComment">
-                            <span>${translations.confirmButton}</span>
-                        </button>
+                        <div style="display: flex; gap: 10px;">
+                            <button id="confirmComment" style="flex: 1;">
+                                <span>${translations.confirmButton}</span>
+                            </button>
+                            <button id="previewComment" style="flex: 1; background: linear-gradient(145deg, #9C27B0, #7B1FA2);">
+                                <span>${translations.previewButton}</span>
+                            </button>
+                        </div>
                     `;
 
-                    // Add event listener for confirm button
+                    // Add event listeners for both buttons
                     document.getElementById('confirmComment').addEventListener('click', () => {
                         chrome.tabs.sendMessage(tab.id, { 
                             action: "postComment",
-                            comment: comment
+                            comment: comment,
+                            preview: false
+                        }, (postResponse) => {
+                            if (postResponse && postResponse.success) {
+                                showMessage(translations.success, 'success');
+                            }
+                        });
+                    });
+
+                    document.getElementById('previewComment').addEventListener('click', () => {
+                        chrome.tabs.sendMessage(tab.id, { 
+                            action: "postComment",
+                            comment: comment,
+                            preview: true
                         }, (postResponse) => {
                             if (postResponse && postResponse.success) {
                                 showMessage(translations.success, 'success');

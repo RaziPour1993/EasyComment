@@ -1,13 +1,13 @@
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === "postComment") {
-        postCommentToYoutube(request.comment)
+        postCommentToYoutube(request.comment, request.preview)
             .then(() => {
-                console.log('Comment posted successfully');
+                console.log('Comment action completed successfully');
                 sendResponse({ success: true });
             })
             .catch(error => {
-                console.error('Failed to post comment:', error);
+                console.error('Failed to handle comment:', error);
                 sendResponse({ success: false, error: error.toString() });
             });
         return true;
@@ -15,7 +15,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 // Post comment to YouTube
-function postCommentToYoutube(comment) {
+function postCommentToYoutube(comment, preview = false) {
     return new Promise(async (resolve, reject) => {
         try {
             // Scroll to comments section
@@ -59,17 +59,19 @@ function postCommentToYoutube(comment) {
             // Wait for submit button to be enabled
             await new Promise(resolve => setTimeout(resolve, 1000));
 
-            // Click on submit button
-            const submitButton = document.querySelector('#submit-button');
-            if (!submitButton) {
-                throw new Error('Submit button not found');
+            // Only click submit if not in preview mode
+            if (!preview) {
+                const submitButton = document.querySelector('#submit-button');
+                if (!submitButton) {
+                    throw new Error('Submit button not found');
+                }
+                submitButton.click();
             }
 
-            submitButton.click();
             resolve(true);
 
         } catch (error) {
-            console.error('Error posting comment:', error);
+            console.error('Error handling comment:', error);
             reject(error.message);
         }
     });

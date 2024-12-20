@@ -8,6 +8,7 @@ const translations = {
     goToYoutube: "Please go to a YouTube video page.",
     error: "An error occurred. Please try again.",
     success: "Comment was successfully placed in the comments field.",
+    previewButton: "Preview Comment",
     comments: {
         1: "Unfortunately, the video content didn't meet expectations 😕",
         2: "The video needs improvement in quality and content 🤔",

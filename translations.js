@@ -1,5 +1,5 @@
 const translations = {
-    title: "✨ Smart Comment Generator",
+    title: "✨ EasyComment",
     ratingLabel: "Your Rating",
     generateButton: "Generate Comment",
     loading: "Generating smart comment...",
@@ -16,4 +16,4 @@ const translations = {
         4: "Very useful and practical content! Keep it up 👏",
         5: "Absolutely amazing! One of the best videos I've seen on this topic ⭐️🌟"
     }
-}; 
+};

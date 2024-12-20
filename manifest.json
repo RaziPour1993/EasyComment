@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "YouTube Comment Generator",
+  "name": "EasyComment",
   "version": "1.0",
   "description": "Generate smart comments for YouTube videos",
   "permissions": [

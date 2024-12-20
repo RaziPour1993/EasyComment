@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html dir="rtl" lang="fa">
+<html dir="ltr" lang="en">
 <head>
     <meta charset="UTF-8">
     <style>
@@ -16,7 +16,7 @@
         body {
             width: 350px;
             padding: 20px;
-            font-family: Tahoma, Arial, sans-serif;
+            font-family: Arial, sans-serif;
             background: var(--bg-color);
             margin: 0;
             color: var(--text-color);
@@ -182,10 +182,10 @@
 </head>
 <body>
     <div class="container">
-        <h2>✨ تولید کامنت هوشمند</h2>
+        <h2 data-i18n="title">✨ Smart Comment Generator</h2>
         
         <div class="rating-container">
-            <label>امتیاز شما به ویدیو</label>
+            <label data-i18n="ratingLabel">Your Rating</label>
             <div class="stars">
                 <span class="star" data-rating="1">★</span>
                 <span class="star" data-rating="2">★</span>
@@ -196,17 +196,18 @@
         </div>
         
         <button id="generateComment">
-            <span>تولید کامنت</span>
+            <span data-i18n="generateButton">Generate Comment</span>
         </button>
         
         <div class="loading">
             <div class="spinner"></div>
-            <div class="loading-text">در حال تولید کامنت هوشمند...</div>
+            <div class="loading-text" data-i18n="loading">Generating smart comment...</div>
         </div>
 
         <div id="result"></div>
     </div>
 
+    <script src="translations.js"></script>
     <script src="popup.js"></script>
 </body>
 </html>

@@ -46,7 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Handle generate comment button click
     generateButton.addEventListener('click', () => {
         if (rating === 0) {
-            showMessage('لطفاً یک امتیاز انتخاب کنید.', 'error');
+            showMessage(translations.selectRating, 'error');
             return;
         }
 
@@ -59,21 +59,21 @@ document.addEventListener('DOMContentLoaded', () => {
             // Get current tab to ensure we're on YouTube
             chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
                 if (!tab.url.includes('youtube.com/watch')) {
-                    showMessage('لطفاً به یک صفحه ویدیوی یوتیوب بروید.', 'error');
+                    showMessage(translations.goToYoutube, 'error');
                     loadingDiv.style.display = 'none';
                     generateButton.disabled = false;
                     return;
                 }
 
                 // Generate comment based on rating
-                setTimeout(() => { // Added timeout to show loading animation
-                    const comment = generateComment(rating);
+                setTimeout(() => {
+                    const comment = translations.comments[rating];
                     loadingDiv.style.display = 'none';
                     resultDiv.style.display = 'block';
                     resultDiv.innerHTML = `
                         <div style="font-size: 16px; line-height: 1.6;">${comment}</div>
                         <button id="confirmComment">
-                            <span>ارسال کامنت</span>
+                            <span>${translations.confirmButton}</span>
                         </button>
                     `;
 
@@ -84,7 +84,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             comment: comment
                         }, (postResponse) => {
                             if (postResponse && postResponse.success) {
-                                showMessage('کامنت با موفقیت در فیلد نظرات قرار گرفت.', 'success');
+                                showMessage(translations.success, 'success');
                             }
                         });
                     });
@@ -95,23 +95,12 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             loadingDiv.style.display = 'none';
             generateButton.disabled = false;
-            showMessage('خطایی رخ داد. لطفاً دوباره تلاش کنید.', 'error');
+            showMessage(translations.error, 'error');
         }
     });
 
     function showMessage(message, type) {
         resultDiv.style.display = 'block';
         resultDiv.innerHTML = `<div class="${type}-message">${message}</div>`;
-    }
-
-    function generateComment(rating) {
-        const comments = {
-            1: "متأسفانه محتوای ویدیو انتظارات را برآورده نکرد 😕",
-            2: "ویدیو نیاز به بهبود در کیفیت و محتوا دارد 🤔",
-            3: "ویدیوی نسبتاً خوبی بود، ممنون از اشتراک‌گذاری 👍",
-            4: "محتوای بسیار مفید و کاربردی! ادامه بدید 👏",
-            5: "فوق‌العاده عالی بود! یکی از بهترین ویدیوهایی که در این زمینه دیدم ⭐️🌟"
-        };
-        return comments[rating];
     }
 });

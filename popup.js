@@ -86,11 +86,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     // Add event listeners for both buttons
                     document.getElementById('confirmComment').addEventListener('click', () => {
+                        showLoading();
                         chrome.tabs.sendMessage(tab.id, { 
                             action: "postComment",
                             comment: comment,
                             preview: false
                         }, (postResponse) => {
+                            hideLoading();
                             if (postResponse && postResponse.success) {
                                 showMessage(translations.success, 'success');
                             }
@@ -98,11 +100,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
 
                     document.getElementById('previewComment').addEventListener('click', () => {
+                        showLoading();
                         chrome.tabs.sendMessage(tab.id, { 
                             action: "postComment",
                             comment: comment,
                             preview: true
                         }, (postResponse) => {
+                            hideLoading();
                             if (postResponse && postResponse.success) {
                                 showMessage(translations.success, 'success');
                             }
@@ -122,5 +126,15 @@ document.addEventListener('DOMContentLoaded', () => {
     function showMessage(message, type) {
         resultDiv.style.display = 'block';
         resultDiv.innerHTML = `<div class="${type}-message">${message}</div>`;
+    }
+
+    function showLoading() {
+        loadingDiv.style.display = 'block';
+        resultDiv.style.display = 'none';
+    }
+
+    function hideLoading() {
+        loadingDiv.style.display = 'none';
+        resultDiv.style.display = 'block';
     }
 });

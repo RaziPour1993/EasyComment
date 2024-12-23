@@ -83,6 +83,9 @@ const translations = {
             "Lacks essential elements",
             "The structure is confusing",
             "Production value is low",
+            "Not really my cup of tea, but thanks for sharing!",
+            "I didn't enjoy this much, but maybe others will.",
+            "This wasn't great, but I appreciate the effort."
             // ... 90 more similar negative but constructive comments ...
         ],
         2: [
@@ -156,6 +159,9 @@ const translations = {
             "Content feels incomplete",
             "More depth is needed",
             "Organization needs work",
+            "It was okay, but could be better.",
+            "Not bad, but there's room for improvement.",
+            "I found it somewhat interesting, but not quite there."
             // ... 90 more similar slightly negative comments ...
         ],
         3: [
@@ -229,6 +235,9 @@ const translations = {
             "Worth considering",
             "Adequate coverage",
             "Useful resource",
+            "Pretty decent video, thanks for sharing!",
+            "I liked it, keep up the good work!",
+            "This was good, looking forward to more!"
             // ... 90 more similar neutral-positive comments ...
         ],
         4: [
@@ -319,7 +328,10 @@ const translations = {
             "Brilliant masterpiece! 🎊",
             "Exceptional work! 💫",
             "World-class content! ✨",
-            "Simply outstanding! 🌟"
+            "Simply outstanding! 🌟",
+            "Great video, really enjoyed it!",
+            "This was awesome, well done!",
+            "Loved it, keep it up!"
             // ... 90 more similar positive comments ...
         ],
         5: [
@@ -390,7 +402,10 @@ const translations = {
             "Brilliant masterpiece! 🎊",
             "Exceptional work! 💫",
             "World-class content! ✨",
-            "Simply outstanding! 🌟"
+            "Simply outstanding! 🌟",
+            "Absolutely fantastic, amazing job!",
+            "This was perfect, couldn't ask for more!",
+            "Incredible video, you're a star!"
             // ... 90 more similar very positive comments ...
         ]
     }

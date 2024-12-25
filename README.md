@@ -8,6 +8,7 @@ EasyComment is a Chrome extension designed to help users quickly generate and po
 - **Comment Generation**: Automatically generates comments based on the selected rating.
 - **Preview and Confirm**: Users can preview the generated comment before posting it.
 - **YouTube Integration**: Ensures that comments are only posted on YouTube video pages.
+- **Auto 5-Star Comment**: Automatically posts a 5-star comment when the button next to the "Subscribe" button is clicked.
 
 ## Installation
 
@@ -26,6 +27,7 @@ EasyComment is a Chrome extension designed to help users quickly generate and po
 3. Rate the video using the star rating system.
 4. Click "Generate Comment" to generate a comment based on the rating.
 5. Preview the comment and click "Confirm" to post it.
+6. Alternatively, click the button next to the "Subscribe" button to automatically post a 5-star comment.
 
 ## Contributing
 

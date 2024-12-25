@@ -1,0 +1,61 @@
+.easy-comment-button {
+    background: var(--yt-button-bg, #F2F2F2);
+    color: var(--yt-button-color, #030303);
+    border: 1px solid var(--yt-button-border, #d3d3d3);
+    padding: 0;
+    border-radius: 50%;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    width: 36px;
+    height: 36px;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    margin: 0 4px;
+    transition: background-color 0.2s, border-color 0.2s;
+    vertical-align: middle;
+}
+
+.easy-comment-button:hover {
+    background-color: var(--yt-button-hover-bg, #e8e8e8);
+    border-color: var(--yt-button-hover-border, #c6c6c6);
+}
+
+.easy-comment-button .icon {
+    font-size: 18px;
+}
+
+.easy-comment-button .spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top: 2px solid #fff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --yt-button-bg: #292929;
+        --yt-button-color: #fff;
+        --yt-button-border: #555;
+        --yt-button-hover-bg: #4a4a4a;
+        --yt-button-hover-border: #666;
+    }
+}
+
+@media (prefers-color-scheme: light) {
+    :root {
+        --yt-button-bg: #F2F2F2;
+        --yt-button-color: #030303;
+        --yt-button-border: #d3d3d3;
+        --yt-button-hover-bg: #e0e0e0;
+        --yt-button-hover-border: #b0b0b0;
+    }
+}

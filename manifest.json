@@ -6,7 +6,8 @@
   "permissions": [
     "activeTab",
     "scripting",
-    "storage"
+    "storage",
+    "action"
   ],
   "host_permissions": [
     "https://www.youtube.com/*"
@@ -22,7 +23,8 @@
   "content_scripts": [
     {
       "matches": ["https://www.youtube.com/*"],
-      "js": ["translations.js", "content.js"]
+      "js": ["translations.js", "content.js"],
+      "css": ["styles.css"]
     }
   ],
   "icons": {

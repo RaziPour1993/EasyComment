@@ -75,10 +75,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div style="font-size: 16px; line-height: 1.2; margin-bottom: 20px;">${comment}</div>
                     <div style="display: flex; gap: 10px;">
                         <button id="confirmComment" style="flex: 1; background: var(--confirm-button-color);">
-                            <span>${translations.confirmButton}</span>
+                            <span>💬 ${translations.confirmButton}</span>
                         </button>
                         <button id="previewComment" style="flex: 1; background: var(--preview-button-color);">
-                            <span>${translations.previewButton}</span>
+                            <span>👁️ ${translations.previewButton}</span>
                         </button>
                     </div>
                 `;

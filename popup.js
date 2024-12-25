@@ -51,7 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Show loading and disable button
-        showLoading();
+        showLoading('Generating your comment...');
         generateButton.disabled = true;
 
         try {
@@ -101,8 +101,9 @@ document.addEventListener('DOMContentLoaded', () => {
         resultDiv.innerHTML = `<div class="${type}-message">${message}</div>`;
     }
 
-    function showLoading() {
+    function showLoading(message) {
         loadingDiv.style.display = 'block';
+        loadingDiv.querySelector('.loading-text').textContent = message;
         resultDiv.style.display = 'none';
     }
 
@@ -113,7 +114,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function handleCommentAction(tabId, comment, preview) {
         try {
-            showLoading();
+            showLoading(preview ? 'Previewing your comment...' : 'Posting your comment...');
             const postResponse = await chrome.tabs.sendMessage(tabId, { 
                 action: "postComment",
                 comment: comment,

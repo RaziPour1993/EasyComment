@@ -4,10 +4,7 @@
   "version": "1.0.0",
   "description": "Generate smart comments for YouTube videos",
   "permissions": [
-    "activeTab",
-    "scripting",
-    "storage",
-    "action"
+    "activeTab"
   ],
   "host_permissions": [
     "https://www.youtube.com/*"

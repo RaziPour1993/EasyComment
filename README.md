@@ -12,6 +12,8 @@ EasyComment is a Chrome extension designed to help users quickly generate and po
 
 ## Installation
 
+https://chromewebstore.google.com/detail/easy-comment/nidncjnlippkfbjppakpbffogblcjjof
+
 1. Clone the repository:
     ```bash
     git clone https://github.com/yourusername/EasyComment.git

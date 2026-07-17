@@ -1,7 +1,8 @@
 /**
  * Comment generation: local templates or Chrome on-device AI (Gemini Nano).
  * Loaded via importScripts in the service worker; attaches to global scope.
- * On-device comments are always English (Gemini Nano language support is limited).
+ * Session stays English-safe for Chrome APIs; output language is chosen in the prompt
+ * from the video title so unsupported locale codes never break LanguageModel.create().
  */
 
 const AI_MODES = {
@@ -17,11 +18,126 @@ const RATING_LABELS = {
     5: 'very positive / excellent'
 };
 
+/**
+ * Detect comment language from the video title script/characters.
+ * Returns a human language name for the prompt (not passed into LanguageModel options).
+ * Persian vs Arabic uses scoring — many Persian titles lack پ/چ/ژ/گ and were mislabeled Arabic.
+ */
+function detectCommentLanguageFromTitle(title) {
+    const text = (title || '').trim();
+    if (!text) {
+        return 'English';
+    }
+
+    if (/[\u0400-\u04FF]/.test(text)) {
+        return 'Russian';
+    }
+    if (/[\u4E00-\u9FFF]/.test(text)) {
+        return 'Chinese';
+    }
+    if (/[\u3040-\u30FF]/.test(text)) {
+        return 'Japanese';
+    }
+    if (/[\uAC00-\uD7AF]/.test(text)) {
+        return 'Korean';
+    }
+    if (/[\u0E00-\u0E7F]/.test(text)) {
+        return 'Thai';
+    }
+    if (/[\u0900-\u097F]/.test(text)) {
+        return 'Hindi';
+    }
+
+    // Arabic / Persian shared script range
+    if (/[\u0600-\u06FF]/.test(text)) {
+        return detectPersianOrArabic(text);
+    }
+
+    if (/[ğüşöçıİĞÜŞÖÇ]/.test(text)) {
+        return 'Turkish';
+    }
+    if (/[äöüßÄÖÜ]/.test(text) && !/[áéíóúñ¿¡]/.test(text)) {
+        return 'German';
+    }
+    if (/[áéíóúñ¿¡ÁÉÍÓÚÑ]/.test(text)) {
+        return 'Spanish';
+    }
+    if (/[àâçéèêëîïôùûüÿœæÀÂÇÉÈÊËÎÏÔÙÛÜŸŒÆ]/.test(text)) {
+        return 'French';
+    }
+    if (/[ãõáàâéêíóôúçÃÕÁÀÂÉÊÍÓÔÚÇ]/.test(text)) {
+        return 'Portuguese';
+    }
+
+    return 'English';
+}
+
+function detectPersianOrArabic(text) {
+    let persianScore = 0;
+    let arabicScore = 0;
+
+    // Distinct Persian letters: پ چ ژ گ + Persian ک/ی
+    const persianLetters = text.match(/[\u067E\u0686\u0698\u06AF\u06A9\u06CC]/g);
+    if (persianLetters) {
+        persianScore += persianLetters.length * 3;
+    }
+
+    // Arabic-specific letters more common in Arabic than Persian
+    const arabicLetters = text.match(/[\u0629\u0649\u0643\u064A\u0625\u0623\u0622]/g);
+    if (arabicLetters) {
+        arabicScore += arabicLetters.length * 3;
+    }
+
+    // Arabic definite article "ال" attached to words
+    const alMatches = text.match(/(?:^|[\s\u200c])ال[\u0600-\u06FF]{2,}/g);
+    if (alMatches) {
+        arabicScore += alMatches.length * 2;
+    }
+
+    // Common Persian function words / YouTube words
+    const persianWords = [
+        'که', 'را', 'این', 'برای', 'با', 'از', 'به', 'در', 'است', 'های',
+        'می', 'ها', 'یک', 'تا', 'هم', 'شود', 'کنید', 'آموزش', 'ویدیو', 'ویدئو',
+        'فیلم', 'جدید', 'کامل', 'بررسی', 'چطور', 'چگونه', 'بهترین', 'ترین',
+        'فارسی', 'ایران', 'دانلود', 'قسمت', 'فصل', 'سری', 'بازی', 'نصب',
+        'ساخت', 'روش', 'معرفی', 'مقایسه', 'نکات', 'آموزشی'
+    ];
+    for (const word of persianWords) {
+        if (text.includes(word)) {
+            persianScore += 2;
+        }
+    }
+
+    // Common Arabic function words
+    const arabicWords = [
+        'على', 'إلى', 'هذا', 'هذه', 'ذلك', 'التي', 'الذي', 'ماذا', 'كيف',
+        'شرح', 'تعلم', 'فيديو', 'جديد', 'أفضل', 'طريقة', 'تحميل'
+    ];
+    for (const word of arabicWords) {
+        if (text.includes(word)) {
+            arabicScore += 2;
+        }
+    }
+
+    // Zero-width non-joiner is very common in Persian typing
+    if (text.includes('\u200c')) {
+        persianScore += 4;
+    }
+
+    if (arabicScore > persianScore) {
+        return 'Arabic';
+    }
+
+    // Default Arabic-script titles to Persian when tied/unclear (shared alphabet).
+    return 'Persian';
+}
+
 function buildCommentPrompt(rating, videoContext) {
     const context = videoContext || {};
     const title = (context.title || '').trim();
     const channel = (context.channel || '').trim();
     const description = (context.description || '').trim();
+    const languageName = detectCommentLanguageFromTitle(title);
 
     if (!title) {
         return [
@@ -34,9 +150,17 @@ function buildCommentPrompt(rating, videoContext) {
     }
 
     return [
-        'Write a short, natural YouTube comment in English only.',
+        'Write a short, natural YouTube comment.',
+        `CRITICAL LANGUAGE: Write the ENTIRE comment in ${languageName}.`,
+        languageName === 'Persian'
+            ? 'Use Persian (Farsi) script and wording — NOT Arabic.'
+            : `The video title language appears to be ${languageName}. Match that language exactly.`,
+        'Do not translate into English unless the title language is English.',
+        languageName === 'Persian'
+            ? 'Do NOT write in Arabic. The comment must be Persian/Farsi.'
+            : '',
         `The viewer rated this video ${rating}/5 stars (${RATING_LABELS[rating] || 'unknown'}).`,
-        'CRITICAL: The comment MUST be specifically about THIS video, based on its title.',
+        'CRITICAL TOPIC: The comment MUST be specifically about THIS video, based on its title.',
         `Video title: "${title}"`,
         channel ? `Channel: ${channel}` : '',
         description ? `Description snippet: ${description}` : '',
@@ -158,6 +282,13 @@ async function generateOnDeviceComment(rating, videoContext) {
 
         try {
             const prompt = buildCommentPrompt(safeRating, videoContext);
+            const title = (videoContext && videoContext.title) || '';
+            console.log(
+                'Gemini Nano prompt language:',
+                detectCommentLanguageFromTitle(title),
+                '| title:',
+                title.slice(0, 80) || '(missing)'
+            );
             const result = await session.prompt(prompt);
             const comment = cleanAiComment(result);
             if (!comment) {

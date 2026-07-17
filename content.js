@@ -8,90 +8,149 @@ function addEasyCommentButton() {
         button.id = 'easyCommentButton';
         button.className = 'easy-comment-button';
         button.innerHTML = '<span class="icon">💬</span>';
-        
+
         button.addEventListener('click', async () => {
-            // Show loading spinner
             button.innerHTML = '<span class="spinner"></span>';
             button.disabled = true;
 
-            // Generate a random 5-star comment
-            const commentsArray = translations.comments[5];
-            const randomIndex = Math.floor(Math.random() * commentsArray.length);
-            const comment = commentsArray[randomIndex];
-
-            // Post the comment
             try {
-                await postCommentToYoutube(comment, false);
-                console.log('5-star comment posted successfully');
+                const response = await chrome.runtime.sendMessage({
+                    action: 'generateComment',
+                    rating: 5
+                });
+
+                if (!response || !response.success || !response.comment) {
+                    console.error('Failed to generate comment:', response && response.error);
+                    return;
+                }
+
+                await postCommentToYoutube(response.comment, false);
+                console.log('Comment posted successfully');
             } catch (error) {
-                console.error('Failed to post 5-star comment:', error);
+                console.error('Failed to post comment from in-page button:', error);
             } finally {
-                // Restore button icon
                 button.innerHTML = '<span class="icon">💬</span>';
                 button.disabled = false;
             }
         });
 
-        // Insert button next to the "Subscribe" button
         if (subscribeButtonContainer) {
             subscribeButtonContainer.insertAdjacentElement('afterend', button);
         }
     }
 }
 
+function getTextContent(selector) {
+    const el = document.querySelector(selector);
+    return el ? (el.textContent || '').trim() : '';
+}
+
+function getVideoContext() {
+    try {
+        const title =
+            getTextContent('h1.ytd-watch-metadata yt-formatted-string') ||
+            getTextContent('h1.ytd-watch-metadata') ||
+            getTextContent('h1.title') ||
+            document.title.replace(/ - YouTube$/, '').trim();
+
+        const channel =
+            getTextContent('#channel-name a') ||
+            getTextContent('#owner #channel-name') ||
+            getTextContent('ytd-channel-name a') ||
+            '';
+
+        let description =
+            getTextContent('#description-inline-expander') ||
+            getTextContent('#description-inner') ||
+            getTextContent('#description') ||
+            '';
+
+        if (description.length > 500) {
+            description = description.slice(0, 500);
+        }
+
+        return {
+            success: true,
+            title,
+            channel,
+            description
+        };
+    } catch (error) {
+        console.error('Failed to scrape video context:', error);
+        return {
+            success: false,
+            title: '',
+            channel: '',
+            description: '',
+            error: error.toString()
+        };
+    }
+}
+
 // Initial button addition
 addEasyCommentButton();
 
-// Listen for messages from popup
+// Listen for messages from popup / background
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.action === "postComment") {
+    if (request.action === 'postComment') {
         postCommentToYoutube(request.comment, request.preview)
             .then(() => {
                 console.log('Comment action completed successfully');
                 sendResponse({ success: true });
             })
-            .catch(error => {
+            .catch((error) => {
                 console.error('Failed to handle comment:', error);
                 sendResponse({ success: false, error: error.toString() });
             });
         return true;
     }
+
+    if (request.action === 'getVideoContext') {
+        try {
+            sendResponse(getVideoContext());
+        } catch (error) {
+            console.error('getVideoContext handler failed:', error);
+            sendResponse({
+                success: false,
+                title: '',
+                channel: '',
+                description: '',
+                error: error.toString()
+            });
+        }
+        return false;
+    }
+
+    return false;
 });
 
 // Post comment to YouTube
 async function postCommentToYoutube(comment, preview = false) {
     try {
-        // Scroll to comments section
         const commentsSection = document.querySelector('#comments');
         if (!commentsSection) {
             throw new Error('Comments section not found');
         }
         commentsSection.scrollIntoView({ behavior: 'smooth' });
-        
-        // Wait for comments section to load completely
-        await new Promise(resolve => setTimeout(resolve, 2000));
 
-        // Click on comment box
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+
         const commentBox = document.querySelector('#simplebox-placeholder');
         if (!commentBox) {
             throw new Error('Comment box not found');
         }
         commentBox.click();
 
-        // Wait for comment box to open
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        await new Promise((resolve) => setTimeout(resolve, 1500));
 
-        // Find and fill the comment field
         const commentInput = document.querySelector('#contenteditable-root');
         if (!commentInput) {
             throw new Error('Comment input field not found');
         }
 
-        // Enter comment text
         commentInput.focus();
         commentInput.textContent = comment;
-        
-        // Simulate typing
+
         const inputEvent = new InputEvent('input', {
             bubbles: true,
             cancelable: true,
@@ -99,10 +158,8 @@ async function postCommentToYoutube(comment, preview = false) {
         });
         commentInput.dispatchEvent(inputEvent);
 
-        // Wait for submit button to be enabled
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise((resolve) => setTimeout(resolve, 1000));
 
-        // Only click submit if not in preview mode
         if (!preview) {
             const submitButton = document.querySelector('#submit-button');
             if (!submitButton) {
@@ -112,7 +169,6 @@ async function postCommentToYoutube(comment, preview = false) {
         }
 
         return true;
-
     } catch (error) {
         console.error('Error handling comment:', error);
         throw new Error(error.message);
@@ -124,7 +180,6 @@ const observer = new MutationObserver(() => {
     addEasyCommentButton();
 });
 
-// Start observing
 observer.observe(document.body, {
     childList: true,
     subtree: true

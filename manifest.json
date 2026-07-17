@@ -1,14 +1,20 @@
 {
   "manifest_version": 3,
   "name": "Easy Comment",
-  "version": "1.0.0",
-  "description": "Generate smart comments for YouTube videos",
+  "version": "1.1.0",
+  "description": "Generate smart comments for YouTube videos with templates or AI",
   "permissions": [
-    "activeTab"
+    "activeTab",
+    "storage"
   ],
   "host_permissions": [
-    "https://www.youtube.com/*"
+    "https://www.youtube.com/*",
+    "https://api.openai.com/*",
+    "https://generativelanguage.googleapis.com/*"
   ],
+  "background": {
+    "service_worker": "background.js"
+  },
   "action": {
     "default_popup": "popup.html",
     "default_icon": {

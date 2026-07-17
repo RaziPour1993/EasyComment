@@ -45,28 +45,45 @@ function getTextContent(selector) {
     return el ? (el.textContent || '').trim() : '';
 }
 
+function getMetaContent(selector) {
+    const el = document.querySelector(selector);
+    if (!el) return '';
+    return (el.getAttribute('content') || '').trim();
+}
+
 function getVideoContext() {
     try {
         const title =
             getTextContent('h1.ytd-watch-metadata yt-formatted-string') ||
             getTextContent('h1.ytd-watch-metadata') ||
+            getTextContent('ytd-watch-metadata h1') ||
+            getTextContent('#title h1') ||
+            getTextContent('h1.title yt-formatted-string') ||
             getTextContent('h1.title') ||
-            document.title.replace(/ - YouTube$/, '').trim();
+            getMetaContent('meta[name="title"]') ||
+            getMetaContent('meta[property="og:title"]') ||
+            document.title.replace(/ - YouTube$/i, '').trim();
 
         const channel =
             getTextContent('#channel-name a') ||
+            getTextContent('#owner #channel-name yt-formatted-string') ||
             getTextContent('#owner #channel-name') ||
             getTextContent('ytd-channel-name a') ||
+            getTextContent('ytd-video-owner-renderer #channel-name') ||
+            getMetaContent('link[itemprop="name"]') ||
             '';
 
         let description =
+            getTextContent('#description-inline-expander yt-attributed-string') ||
             getTextContent('#description-inline-expander') ||
             getTextContent('#description-inner') ||
             getTextContent('#description') ||
+            getMetaContent('meta[name="description"]') ||
+            getMetaContent('meta[property="og:description"]') ||
             '';
 
-        if (description.length > 500) {
-            description = description.slice(0, 500);
+        if (description.length > 400) {
+            description = description.slice(0, 400);
         }
 
         return {

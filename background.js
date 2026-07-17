@@ -1,30 +1,14 @@
 importScripts('translations.js', 'ai.js');
 
-const STORAGE_KEYS = {
-    generationMode: 'generationMode',
-    openaiApiKey: 'openaiApiKey',
-    geminiApiKey: 'geminiApiKey'
-};
-
-async function getStoredSettings() {
+async function getStoredMode() {
     try {
-        const data = await chrome.storage.sync.get([
-            STORAGE_KEYS.generationMode,
-            STORAGE_KEYS.openaiApiKey,
-            STORAGE_KEYS.geminiApiKey
-        ]);
-        return {
-            generationMode: data.generationMode || AI_MODES.TEMPLATE,
-            openaiApiKey: data.openaiApiKey || '',
-            geminiApiKey: data.geminiApiKey || ''
-        };
+        const data = await chrome.storage.sync.get(['generationMode']);
+        return data.generationMode === AI_MODES.ONDEVICE
+            ? AI_MODES.ONDEVICE
+            : AI_MODES.TEMPLATE;
     } catch (error) {
-        console.error('Failed to read settings:', error);
-        return {
-            generationMode: AI_MODES.TEMPLATE,
-            openaiApiKey: '',
-            geminiApiKey: ''
-        };
+        console.error('Failed to read generation mode:', error);
+        return AI_MODES.TEMPLATE;
     }
 }
 
@@ -65,16 +49,22 @@ function mapErrorToMessage(code) {
 }
 
 async function resolveYouTubeTab(sender) {
-    if (sender && sender.tab && sender.tab.id && sender.tab.url && sender.tab.url.includes('youtube.com/watch')) {
+    if (
+        sender &&
+        sender.tab &&
+        sender.tab.id &&
+        sender.tab.url &&
+        sender.tab.url.includes('youtube.com/watch')
+    ) {
         return sender.tab;
     }
     return getActiveYouTubeTab();
 }
 
 async function handleGenerateComment(request, sender) {
-    const settings = await getStoredSettings();
-    const mode = request.mode || settings.generationMode || AI_MODES.TEMPLATE;
     const rating = request.rating;
+    const storedMode = await getStoredMode();
+    const mode = request.mode || storedMode;
 
     if (!rating || rating < 1 || rating > 5) {
         return { success: false, error: mapErrorToMessage('INVALID_RATING') };
@@ -86,20 +76,25 @@ async function handleGenerateComment(request, sender) {
     }
 
     let videoContext = { title: '', channel: '', description: '' };
-    if (mode !== AI_MODES.TEMPLATE) {
+    if (mode === AI_MODES.ONDEVICE) {
         videoContext = await fetchVideoContext(tab.id);
+        if (!videoContext.title && tab.title) {
+            videoContext.title = String(tab.title).replace(/ - YouTube$/i, '').trim();
+        }
     }
 
     try {
-        const comment = await generateComment(mode, rating, videoContext, {
-            openaiApiKey: settings.openaiApiKey,
-            geminiApiKey: settings.geminiApiKey
-        });
-        return { success: true, comment, mode };
+        const result = await generateComment(mode, rating, videoContext);
+        return {
+            success: true,
+            comment: result.comment,
+            mode: result.source,
+            source: result.source
+        };
     } catch (error) {
         const code = error && error.message ? error.message : 'UNKNOWN';
-        console.error('generateComment failed:', code);
-        return { success: false, error: mapErrorToMessage(code), errorCode: code };
+        console.error('generateComment failed:', code, 'mode=', mode);
+        return { success: false, error: mapErrorToMessage(code), errorCode: code, mode };
     }
 }
 
@@ -114,25 +109,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         return true;
     }
 
-    if (request.action === 'getGeminiStatus') {
-        getStoredSettings()
-            .then(async (settings) => {
-                const status = await getGeminiStatus(settings.geminiApiKey);
-                sendResponse({ success: true, status });
-            })
+    if (request.action === 'getBuiltInAiStatus') {
+        getBuiltInAiStatus()
+            .then((status) => sendResponse({ success: true, status }))
             .catch((error) => {
-                console.error('getGeminiStatus failed:', error);
-                sendResponse({ success: false, status: 'needs_setup' });
-            });
-        return true;
-    }
-
-    if (request.action === 'getSettings') {
-        getStoredSettings()
-            .then((settings) => sendResponse({ success: true, settings }))
-            .catch((error) => {
-                console.error('getSettings failed:', error);
-                sendResponse({ success: false, error: translations.error });
+                console.error('getBuiltInAiStatus failed:', error);
+                sendResponse({ success: false, status: 'unavailable' });
             });
         return true;
     }

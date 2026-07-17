@@ -3,43 +3,35 @@ document.addEventListener('DOMContentLoaded', () => {
     const generateButton = document.getElementById('generateComment');
     const resultDiv = document.getElementById('result');
     const loadingDiv = document.querySelector('.loading');
+    const aiStatusEl = document.getElementById('aiStatus');
     const modeButtons = document.querySelectorAll('.mode-btn');
-    const geminiStatusEl = document.getElementById('geminiStatus');
-    const openaiApiKeyInput = document.getElementById('openaiApiKey');
-    const geminiApiKeyInput = document.getElementById('geminiApiKey');
-    const saveKeysButton = document.getElementById('saveKeys');
+    const modeTemplateBtn = document.getElementById('modeTemplate');
+    const modeOnDeviceBtn = document.getElementById('modeOnDevice');
 
     let rating = 0;
     let generationMode = 'template';
+    let userChangedMode = false;
 
-    applyStaticLabels();
-    loadSettings();
+    if (modeTemplateBtn) modeTemplateBtn.textContent = translations.modeTemplate;
+    if (modeOnDeviceBtn) modeOnDeviceBtn.textContent = translations.modeOnDevice;
+
+    const settingsReady = loadSettings();
 
     modeButtons.forEach((btn) => {
         btn.addEventListener('click', async () => {
-            generationMode = btn.dataset.mode;
+            userChangedMode = true;
+            generationMode = btn.dataset.mode === 'ondevice' ? 'ondevice' : 'template';
             updateModeButtons();
+            updateAiStatusVisibility();
             try {
                 await chrome.storage.sync.set({ generationMode });
             } catch (error) {
                 console.error('Failed to save generation mode:', error);
             }
-            refreshGeminiStatus();
+            if (generationMode === 'ondevice') {
+                refreshAiStatus();
+            }
         });
-    });
-
-    saveKeysButton.addEventListener('click', async () => {
-        try {
-            await chrome.storage.sync.set({
-                openaiApiKey: openaiApiKeyInput.value.trim(),
-                geminiApiKey: geminiApiKeyInput.value.trim()
-            });
-            showMessage(translations.keysSaved, 'success');
-            refreshGeminiStatus();
-        } catch (error) {
-            console.error('Failed to save API keys:', error);
-            showMessage(translations.error, 'error');
-        }
     });
 
     stars.forEach((star, index) => {
@@ -79,6 +71,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     generateButton.addEventListener('click', async () => {
+        await settingsReady;
+
         if (rating === 0) {
             showMessage(translations.selectRating, 'error');
             return;
@@ -89,117 +83,60 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-            if (!tab || !tab.url || !tab.url.includes('youtube.com/watch')) {
+            if (!tab || !tab.id || !tab.url || !tab.url.includes('youtube.com/watch')) {
                 showMessage(translations.goToYoutube, 'error');
                 hideLoading();
                 generateButton.disabled = false;
                 return;
             }
 
-            const response = await chrome.runtime.sendMessage({
-                action: 'generateComment',
-                rating,
-                mode: generationMode
-            });
+            // Generate in the popup context so Gemini Nano uses LanguageModel here,
+            // and Local templates never get mixed into the on-device path.
+            let videoContext = { title: '', channel: '', description: '' };
+            if (generationMode === 'ondevice') {
+                videoContext = await fetchVideoContext(tab.id);
+                if (!videoContext.title && tab.title) {
+                    videoContext.title = String(tab.title).replace(/ - YouTube$/i, '').trim();
+                }
+                console.log('Gemini Nano video title:', videoContext.title || '(missing)');
+            }
 
+            const result = await generateComment(generationMode, rating, videoContext);
             hideLoading();
             generateButton.disabled = false;
 
-            if (!response || !response.success || !response.comment) {
-                showMessage((response && response.error) || translations.error, 'error');
+            if (!result || !result.comment) {
+                showMessage(translations.error, 'error');
                 return;
             }
 
-            const comment = response.comment;
-            resultDiv.style.display = 'block';
-            resultDiv.innerHTML = `
-                <div class="comment-text">${escapeHtml(comment)}</div>
-                <div class="action-row">
-                    <button id="confirmComment" type="button">
-                        <span>💬 ${escapeHtml(translations.confirmButton)}</span>
-                    </button>
-                    <button id="previewComment" type="button">
-                        <span>👁️ ${escapeHtml(translations.previewButton)}</span>
-                    </button>
-                </div>
-            `;
-
-            document.getElementById('confirmComment').addEventListener('click', () => {
-                handleCommentAction(tab.id, comment, false);
-            });
-            document.getElementById('previewComment').addEventListener('click', () => {
-                handleCommentAction(tab.id, comment, true);
-            });
+            showGeneratedComment(tab.id, result.comment, result.source);
         } catch (error) {
             console.error('Generate comment failed:', error);
             hideLoading();
             generateButton.disabled = false;
-            showMessage(translations.error, 'error');
+            const code = error && error.message ? error.message : 'UNKNOWN';
+            const mapped =
+                (translations.aiErrors && translations.aiErrors[code]) || translations.error;
+            showMessage(mapped, 'error');
         }
     });
 
-    function applyStaticLabels() {
-        const modeTemplate = document.getElementById('modeTemplate');
-        const modeChatGpt = document.getElementById('modeChatGpt');
-        const modeGemini = document.getElementById('modeGemini');
-
-        if (modeTemplate) modeTemplate.textContent = translations.modeTemplate;
-        if (modeChatGpt) modeChatGpt.textContent = translations.modeChatGpt;
-        if (modeGemini) modeGemini.textContent = translations.modeGemini;
-        if (saveKeysButton) saveKeysButton.textContent = translations.saveKeysButton;
-
-        setupKeyHelp(
-            'openaiKeyHelp',
-            translations.openaiKeyHelp,
-            translations.openaiKeyLinkText,
-            'https://platform.openai.com/api-keys'
-        );
-        setupKeyHelp(
-            'geminiKeyHelp',
-            translations.geminiKeyHelp,
-            translations.geminiKeyLinkText,
-            'https://aistudio.google.com/apikey'
-        );
-    }
-
-    function setupKeyHelp(containerId, helpText, linkText, url) {
-        const container = document.getElementById(containerId);
-        if (!container) return;
-
-        container.textContent = '';
-        container.appendChild(document.createTextNode(`${helpText} `));
-
-        const link = document.createElement('a');
-        link.href = url;
-        link.target = '_blank';
-        link.rel = 'noopener noreferrer';
-        link.textContent = linkText;
-        link.addEventListener('click', (event) => {
-            event.preventDefault();
-            chrome.tabs.create({ url }).catch((error) => {
-                console.error('Failed to open API key help link:', error);
-                window.open(url, '_blank', 'noopener,noreferrer');
-            });
-        });
-        container.appendChild(link);
-    }
-
     async function loadSettings() {
         try {
-            const data = await chrome.storage.sync.get([
-                'generationMode',
-                'openaiApiKey',
-                'geminiApiKey'
-            ]);
-            generationMode = data.generationMode || 'template';
-            openaiApiKeyInput.value = data.openaiApiKey || '';
-            geminiApiKeyInput.value = data.geminiApiKey || '';
-            updateModeButtons();
-            refreshGeminiStatus();
+            const data = await chrome.storage.sync.get(['generationMode']);
+            if (!userChangedMode) {
+                generationMode = data.generationMode === 'ondevice' ? 'ondevice' : 'template';
+            }
         } catch (error) {
             console.error('Failed to load settings:', error);
-            updateModeButtons();
+            if (!userChangedMode) {
+                generationMode = 'template';
+            }
         }
+        updateModeButtons();
+        updateAiStatusVisibility();
+        refreshAiStatus();
     }
 
     function updateModeButtons() {
@@ -208,26 +145,82 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    async function refreshGeminiStatus() {
-        if (generationMode !== 'gemini') {
-            geminiStatusEl.textContent = '';
-            return;
+    function updateAiStatusVisibility() {
+        if (generationMode === 'ondevice') {
+            aiStatusEl.style.display = 'block';
+        } else {
+            aiStatusEl.style.display = 'none';
         }
+    }
 
+    async function refreshAiStatus() {
         try {
-            const response = await chrome.runtime.sendMessage({ action: 'getGeminiStatus' });
-            const status = response && response.status;
-            if (status === 'builtin') {
-                geminiStatusEl.textContent = translations.geminiStatusBuiltin;
-            } else if (status === 'api_key') {
-                geminiStatusEl.textContent = translations.geminiStatusApiKey;
+            // Prefer checking LanguageModel in the popup itself (same context used to generate).
+            let available = false;
+            if (typeof getBuiltInAiStatus === 'function') {
+                available = (await getBuiltInAiStatus()) === 'available';
             } else {
-                geminiStatusEl.textContent = translations.geminiStatusNeedsSetup;
+                const response = await chrome.runtime.sendMessage({ action: 'getBuiltInAiStatus' });
+                available = response && response.status === 'available';
+            }
+
+            aiStatusEl.textContent = available
+                ? translations.aiStatusAvailable
+                : translations.aiStatusUnavailable;
+            aiStatusEl.classList.toggle('available', available);
+            aiStatusEl.classList.toggle('unavailable', !available);
+        } catch (error) {
+            console.error('Failed to refresh AI status:', error);
+            aiStatusEl.textContent = translations.aiStatusUnavailable;
+            aiStatusEl.classList.add('unavailable');
+            aiStatusEl.classList.remove('available');
+        }
+    }
+
+    async function fetchVideoContext(tabId) {
+        try {
+            const response = await chrome.tabs.sendMessage(tabId, { action: 'getVideoContext' });
+            if (response && response.success) {
+                return {
+                    title: response.title || '',
+                    channel: response.channel || '',
+                    description: response.description || ''
+                };
             }
         } catch (error) {
-            console.error('Failed to refresh Gemini status:', error);
-            geminiStatusEl.textContent = translations.geminiStatusNeedsSetup;
+            console.error('Failed to fetch video context from tab:', error);
         }
+        return { title: '', channel: '', description: '' };
+    }
+
+    function showGeneratedComment(tabId, comment, source) {
+        const sourceLabel =
+            source === 'ondevice'
+                ? translations.sourceOnDevice
+                : translations.sourceLocal;
+
+        resultDiv.style.display = 'block';
+        resultDiv.innerHTML = `
+            <div class="comment-text">${escapeHtml(comment)}</div>
+            <div class="ai-status ${source === 'ondevice' ? 'available' : ''}" style="margin-bottom: 12px;">
+                ${escapeHtml(sourceLabel)}
+            </div>
+            <div class="action-row">
+                <button id="confirmComment" type="button">
+                    <span>💬 ${escapeHtml(translations.confirmButton)}</span>
+                </button>
+                <button id="previewComment" type="button">
+                    <span>👁️ ${escapeHtml(translations.previewButton)}</span>
+                </button>
+            </div>
+        `;
+
+        document.getElementById('confirmComment').addEventListener('click', () => {
+            handleCommentAction(tabId, comment, false);
+        });
+        document.getElementById('previewComment').addEventListener('click', () => {
+            handleCommentAction(tabId, comment, true);
+        });
     }
 
     function escapeHtml(text) {

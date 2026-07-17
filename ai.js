@@ -1,12 +1,12 @@
 /**
- * Comment generation providers (template, OpenAI, Gemini cloud, Chrome Built-in AI).
+ * Comment generation: local templates or Chrome on-device AI (Gemini Nano).
  * Loaded via importScripts in the service worker; attaches to global scope.
+ * On-device comments are always English (Gemini Nano language support is limited).
  */
 
 const AI_MODES = {
     TEMPLATE: 'template',
-    CHATGPT: 'chatgpt',
-    GEMINI: 'gemini'
+    ONDEVICE: 'ondevice'
 };
 
 const RATING_LABELS = {
@@ -23,23 +23,31 @@ function buildCommentPrompt(rating, videoContext) {
     const channel = (context.channel || '').trim();
     const description = (context.description || '').trim();
 
-    let contextBlock = '';
-    if (title || channel || description) {
-        contextBlock = [
-            title ? `Video title: ${title}` : '',
-            channel ? `Channel: ${channel}` : '',
-            description ? `Description snippet: ${description}` : ''
-        ].filter(Boolean).join('\n');
+    if (!title) {
+        return [
+            'Write a short, natural YouTube comment in English only.',
+            `The viewer rated this video ${rating}/5 stars (${RATING_LABELS[rating] || 'unknown'}).`,
+            'Match the tone to the rating. Sound like a real person.',
+            'Do not use hashtag spam. Do not wrap the comment in quotes.',
+            'Return ONLY the comment text.'
+        ].join('\n');
     }
 
     return [
-        'Write a short, natural YouTube comment for a viewer.',
+        'Write a short, natural YouTube comment in English only.',
         `The viewer rated this video ${rating}/5 stars (${RATING_LABELS[rating] || 'unknown'}).`,
-        'Match the tone to the rating. Sound like a real person, not marketing copy.',
+        'CRITICAL: The comment MUST be specifically about THIS video, based on its title.',
+        `Video title: "${title}"`,
+        channel ? `Channel: ${channel}` : '',
+        description ? `Description snippet: ${description}` : '',
+        'Mention or clearly refer to the topic, subject, or content suggested by the title.',
+        'Do NOT write a generic comment that could fit any video.',
+        'Do NOT ignore the title. Use details from the title (names, topics, products, games, tutorials, etc.).',
+        'Match the tone to the star rating. Sound like a real person, not marketing copy.',
+        '1 or 2 short sentences max.',
         'Do not use hashtag spam. Do not wrap the comment in quotes.',
-        'Return ONLY the comment text — no preamble, no explanation.',
-        contextBlock ? `\nVideo context:\n${contextBlock}` : '\nNo video metadata available; write a generic rating-appropriate comment.'
-    ].join('\n');
+        'Return ONLY the comment text — no preamble, no explanation.'
+    ].filter(Boolean).join('\n');
 }
 
 function cleanAiComment(text) {
@@ -65,153 +73,91 @@ function generateTemplateComment(rating) {
     return commentsArray[randomIndex];
 }
 
-async function generateChatGptComment(rating, videoContext, apiKey) {
-    if (!apiKey || !apiKey.trim()) {
-        throw new Error('MISSING_OPENAI_KEY');
-    }
-
-    const prompt = buildCommentPrompt(rating, videoContext);
-    const models = ['gpt-4o-mini', 'gpt-4.1-mini', 'gpt-3.5-turbo'];
-    let lastError = null;
-
-    for (const model of models) {
-        try {
-            return await requestOpenAiChatCompletion(apiKey.trim(), model, prompt);
-        } catch (error) {
-            lastError = error;
-            // Only retry with another model when the current model is unavailable
-            if (error.message !== 'OPENAI_MODEL') {
-                throw error;
-            }
-            console.error(`OpenAI model unavailable (${model}), trying next fallback`);
-        }
-    }
-
-    throw lastError || new Error('OPENAI_API');
-}
-
-async function requestOpenAiChatCompletion(apiKey, model, prompt) {
-    let response;
-    try {
-        response = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${apiKey}`
-            },
-            body: JSON.stringify({
-                model,
-                messages: [
-                    {
-                        role: 'system',
-                        content: 'You write short natural YouTube comments. Reply with only the comment text.'
-                    },
-                    { role: 'user', content: prompt }
-                ],
-                temperature: 0.9,
-                max_tokens: 150
-            })
-        });
-    } catch (error) {
-        console.error('OpenAI network error:', error);
-        throw new Error('OPENAI_NETWORK');
-    }
-
-    let data = null;
-    try {
-        data = await response.json();
-    } catch (error) {
-        console.error('OpenAI JSON parse error:', error);
-        if (!response.ok) {
-            throw classifyOpenAiHttpError(response.status, null);
-        }
-        throw new Error('OPENAI_API');
-    }
-
-    if (!response.ok) {
-        throw classifyOpenAiHttpError(response.status, data);
-    }
-
-    const comment = cleanAiComment(data?.choices?.[0]?.message?.content);
-    if (!comment) {
-        throw new Error('EMPTY_AI_RESPONSE');
-    }
-    return comment;
-}
-
-function classifyOpenAiHttpError(status, data) {
-    const apiError = data && data.error ? data.error : {};
-    const code = String(apiError.code || apiError.type || '').toLowerCase();
-    const message = String(apiError.message || '').toLowerCase();
-
-    console.error('OpenAI API error:', status, code || '(no code)', message.slice(0, 200));
-
-    if (status === 401 || status === 403 || code.includes('invalid_api_key')) {
-        return new Error('OPENAI_AUTH');
-    }
-
-    if (
-        status === 429 ||
-        code.includes('insufficient_quota') ||
-        code.includes('quota') ||
-        message.includes('quota') ||
-        message.includes('billing')
-    ) {
-        if (code.includes('rate_limit') || message.includes('rate limit')) {
-            return new Error('OPENAI_RATE_LIMIT');
-        }
-        return new Error('OPENAI_QUOTA');
-    }
-
-    if (
-        status === 404 ||
-        code.includes('model_not_found') ||
-        message.includes('model') && (message.includes('does not exist') || message.includes('not found') || message.includes('access'))
-    ) {
-        return new Error('OPENAI_MODEL');
-    }
-
-    if (status === 400 && (message.includes('model') || code.includes('model'))) {
-        return new Error('OPENAI_MODEL');
-    }
-
-    return new Error('OPENAI_API');
-}
-
-async function isBuiltInAiAvailable() {
+async function getBuiltInAiStatus() {
     try {
         if (typeof LanguageModel === 'undefined') {
-            return false;
+            return 'unavailable';
         }
-        const availability = await LanguageModel.availability();
-        return availability === 'available' || availability === 'readily' || availability === 'after-download' || availability === 'downloadable';
+        const availability = await LanguageModel.availability({
+            expectedInputs: [{ type: 'text', languages: ['en'] }],
+            expectedOutputs: [{ type: 'text', languages: ['en'] }]
+        });
+        if (
+            availability === 'available' ||
+            availability === 'readily' ||
+            availability === 'after-download' ||
+            availability === 'downloadable' ||
+            availability === 'downloading'
+        ) {
+            return 'available';
+        }
+        return 'unavailable';
     } catch (error) {
-        console.error('Built-in AI availability check failed:', error);
-        return false;
+        // Older Chrome builds may not accept the options object.
+        try {
+            const availability = await LanguageModel.availability();
+            if (
+                availability === 'available' ||
+                availability === 'readily' ||
+                availability === 'after-download' ||
+                availability === 'downloadable' ||
+                availability === 'downloading'
+            ) {
+                return 'available';
+            }
+            return 'unavailable';
+        } catch (fallbackError) {
+            console.error('Built-in AI status check failed:', fallbackError);
+            return 'unavailable';
+        }
     }
 }
 
-async function generateBuiltInGeminiComment(rating, videoContext) {
+async function createLanguageModelSession() {
+    const monitor = (m) => {
+        m.addEventListener('downloadprogress', (e) => {
+            console.log(`Built-in model download: ${Math.round((e.loaded || 0) * 100)}%`);
+        });
+    };
+
+    try {
+        return await LanguageModel.create({
+            monitor,
+            expectedInputs: [{ type: 'text', languages: ['en'] }],
+            expectedOutputs: [{ type: 'text', languages: ['en'] }]
+        });
+    } catch (error) {
+        console.error('LanguageModel.create with en options failed, retrying plain create:', error);
+        return LanguageModel.create({ monitor });
+    }
+}
+
+async function generateOnDeviceComment(rating, videoContext) {
+    const safeRating = Math.min(5, Math.max(1, Number(rating) || 1));
+
     try {
         if (typeof LanguageModel === 'undefined') {
             throw new Error('BUILTIN_UNAVAILABLE');
         }
 
-        const availability = await LanguageModel.availability();
+        let availability;
+        try {
+            availability = await LanguageModel.availability({
+                expectedInputs: [{ type: 'text', languages: ['en'] }],
+                expectedOutputs: [{ type: 'text', languages: ['en'] }]
+            });
+        } catch (error) {
+            availability = await LanguageModel.availability();
+        }
+
         if (availability === 'unavailable') {
             throw new Error('BUILTIN_UNAVAILABLE');
         }
 
-        const session = await LanguageModel.create({
-            monitor(m) {
-                m.addEventListener('downloadprogress', (e) => {
-                    console.log(`Built-in model download: ${Math.round((e.loaded || 0) * 100)}%`);
-                });
-            }
-        });
+        const session = await createLanguageModelSession();
 
         try {
-            const prompt = buildCommentPrompt(rating, videoContext);
+            const prompt = buildCommentPrompt(safeRating, videoContext);
             const result = await session.prompt(prompt);
             const comment = cleanAiComment(result);
             if (!comment) {
@@ -224,7 +170,10 @@ async function generateBuiltInGeminiComment(rating, videoContext) {
             }
         }
     } catch (error) {
-        if (error.message === 'EMPTY_AI_RESPONSE' || error.message === 'BUILTIN_UNAVAILABLE') {
+        if (
+            error.message === 'EMPTY_AI_RESPONSE' ||
+            error.message === 'BUILTIN_UNAVAILABLE'
+        ) {
             throw error;
         }
         console.error('Built-in AI generation failed:', error);
@@ -232,115 +181,24 @@ async function generateBuiltInGeminiComment(rating, videoContext) {
     }
 }
 
-async function generateGeminiCloudComment(rating, videoContext, apiKey) {
-    if (!apiKey || !apiKey.trim()) {
-        throw new Error('MISSING_GEMINI_KEY');
-    }
-
-    const prompt = buildCommentPrompt(rating, videoContext);
-    const url =
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' +
-        encodeURIComponent(apiKey.trim());
-
-    let response;
-    try {
-        response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [
-                    {
-                        parts: [{ text: prompt }]
-                    }
-                ],
-                generationConfig: {
-                    temperature: 0.9,
-                    maxOutputTokens: 150
-                }
-            })
-        });
-    } catch (error) {
-        console.error('Gemini network error:', error);
-        throw new Error('GEMINI_NETWORK');
-    }
-
-    if (!response.ok) {
-        const status = response.status;
-        console.error('Gemini API error status:', status);
-        if (status === 400 || status === 401 || status === 403) {
-            throw new Error('GEMINI_AUTH');
-        }
-        throw new Error('GEMINI_API');
-    }
-
-    let data;
-    try {
-        data = await response.json();
-    } catch (error) {
-        console.error('Gemini JSON parse error:', error);
-        throw new Error('GEMINI_API');
-    }
-
-    const parts = data?.candidates?.[0]?.content?.parts;
-    const text = Array.isArray(parts)
-        ? parts.map((p) => p.text || '').join('').trim()
-        : '';
-    const comment = cleanAiComment(text);
-    if (!comment) {
-        throw new Error('EMPTY_AI_RESPONSE');
-    }
-    return comment;
-}
-
-async function generateGeminiComment(rating, videoContext, geminiApiKey) {
-    const builtInReady = await isBuiltInAiAvailable();
-    if (builtInReady) {
-        try {
-            return await generateBuiltInGeminiComment(rating, videoContext);
-        } catch (error) {
-            console.error('Built-in Gemini failed, trying cloud if key present:', error.message);
-            if (geminiApiKey && geminiApiKey.trim()) {
-                return generateGeminiCloudComment(rating, videoContext, geminiApiKey);
-            }
-            throw error;
-        }
-    }
-
-    if (geminiApiKey && geminiApiKey.trim()) {
-        return generateGeminiCloudComment(rating, videoContext, geminiApiKey);
-    }
-
-    throw new Error('GEMINI_NO_PROVIDER');
-}
-
 /**
- * @param {'template'|'chatgpt'|'gemini'} mode
+ * @param {'template'|'ondevice'} mode
  * @param {number} rating
  * @param {{ title?: string, channel?: string, description?: string }} videoContext
- * @param {{ openaiApiKey?: string, geminiApiKey?: string }} keys
  */
-async function generateComment(mode, rating, videoContext, keys) {
+async function generateComment(mode, rating, videoContext) {
     const safeRating = Math.min(5, Math.max(1, Number(rating) || 1));
-    const safeKeys = keys || {};
+    const normalizedMode = String(mode || '').trim().toLowerCase();
 
-    switch (mode) {
-        case AI_MODES.CHATGPT:
-            return generateChatGptComment(safeRating, videoContext, safeKeys.openaiApiKey);
-        case AI_MODES.GEMINI:
-            return generateGeminiComment(safeRating, videoContext, safeKeys.geminiApiKey);
-        case AI_MODES.TEMPLATE:
-        default:
-            return generateTemplateComment(safeRating);
+    if (normalizedMode === AI_MODES.ONDEVICE) {
+        const comment = await generateOnDeviceComment(safeRating, videoContext);
+        return { comment, source: AI_MODES.ONDEVICE };
     }
-}
 
-async function getGeminiStatus(geminiApiKey) {
-    const builtIn = await isBuiltInAiAvailable();
-    if (builtIn) {
-        return 'builtin';
+    if (normalizedMode === AI_MODES.TEMPLATE || normalizedMode === 'local') {
+        const comment = generateTemplateComment(safeRating);
+        return { comment, source: AI_MODES.TEMPLATE };
     }
-    if (geminiApiKey && geminiApiKey.trim()) {
-        return 'api_key';
-    }
-    return 'needs_setup';
+
+    throw new Error('UNKNOWN_MODE');
 }

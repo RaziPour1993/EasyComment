@@ -21,7 +21,6 @@
                 --rating-bg: rgba(255,255,255,0.9);
                 --star-default: #ddd;
                 --muted-color: #666;
-                --input-border: #ddd;
             }
         }
 
@@ -33,12 +32,11 @@
                 --rating-bg: rgba(45,45,45,0.9);
                 --star-default: #555;
                 --muted-color: #aaa;
-                --input-border: #444;
             }
         }
 
         body {
-            width: 320px;
+            width: 300px;
             padding: 15px;
             font-family: Arial, sans-serif;
             background: var(--bg-color);
@@ -62,6 +60,60 @@
             font-size: 20px;
             text-align: center;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .ai-status {
+            font-size: 12px;
+            color: var(--muted-color);
+            line-height: 1.4;
+            text-align: center;
+            padding: 8px;
+            background: var(--rating-bg);
+            border-radius: 8px;
+            min-height: 16px;
+        }
+
+        .ai-status.available {
+            color: var(--success-color);
+        }
+
+        .ai-status.unavailable {
+            color: var(--error-color);
+        }
+
+        .mode-section {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .mode-switch {
+            display: flex;
+            gap: 4px;
+            background: var(--rating-bg);
+            padding: 4px;
+            border-radius: 8px;
+        }
+
+        .mode-switch button.mode-btn {
+            flex: 1;
+            padding: 8px 4px;
+            font-size: 12px;
+            background: transparent;
+            color: var(--text-color);
+            box-shadow: none;
+            text-shadow: none;
+            border: 1px solid transparent;
+        }
+
+        .mode-switch button.mode-btn:hover {
+            transform: none;
+            background: rgba(33, 150, 243, 0.15);
+        }
+
+        .mode-switch button.mode-btn.active {
+            background: linear-gradient(135deg, #2196F3, #1976D2);
+            color: #fff;
         }
 
         .rating-container {
@@ -197,107 +249,6 @@
             font-size: 14px;
         }
 
-        .mode-section {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .mode-switch {
-            display: flex;
-            gap: 4px;
-            background: var(--rating-bg);
-            padding: 4px;
-            border-radius: 8px;
-        }
-
-        .mode-switch button.mode-btn {
-            flex: 1;
-            padding: 8px 4px;
-            font-size: 12px;
-            background: transparent;
-            color: var(--text-color);
-            box-shadow: none;
-            text-shadow: none;
-            border: 1px solid transparent;
-        }
-
-        .mode-switch button.mode-btn:hover {
-            transform: none;
-            background: rgba(33, 150, 243, 0.15);
-        }
-
-        .mode-switch button.mode-btn.active {
-            background: linear-gradient(135deg, #2196F3, #1976D2);
-            color: #fff;
-        }
-
-        .gemini-status {
-            font-size: 11px;
-            color: var(--muted-color);
-            line-height: 1.4;
-            min-height: 16px;
-        }
-
-        details.api-keys {
-            background: var(--rating-bg);
-            border-radius: var(--border-radius);
-            padding: 8px 10px;
-        }
-
-        details.api-keys summary {
-            cursor: pointer;
-            font-weight: bold;
-            color: var(--primary-color);
-            font-size: 13px;
-            outline: none;
-        }
-
-        .api-keys-body {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            margin-top: 10px;
-        }
-
-        .api-keys-body label {
-            font-size: 12px;
-        }
-
-        .api-keys-body input {
-            width: 100%;
-            box-sizing: border-box;
-            padding: 8px;
-            border-radius: 6px;
-            border: 1px solid var(--input-border);
-            background: var(--bg-color);
-            color: var(--text-color);
-            font-size: 12px;
-        }
-
-        #saveKeys {
-            background: linear-gradient(135deg, #4CAF50, #388E3C);
-            font-size: 12px;
-            padding: 8px;
-        }
-
-        .key-help {
-            font-size: 11px;
-            color: var(--muted-color);
-            line-height: 1.4;
-            margin: -2px 0 4px;
-        }
-
-        .key-help a {
-            color: var(--primary-color);
-            text-decoration: underline;
-            cursor: pointer;
-        }
-
-        .key-help a:hover {
-            opacity: 0.85;
-        }
-
         .comment-text {
             font-size: 16px;
             line-height: 1.2;
@@ -330,25 +281,11 @@
         <div class="mode-section">
             <label data-i18n="modeLabel">Generation mode</label>
             <div class="mode-switch" role="group" aria-label="Generation mode">
-                <button type="button" class="mode-btn active" data-mode="template" id="modeTemplate">Template</button>
-                <button type="button" class="mode-btn" data-mode="chatgpt" id="modeChatGpt">ChatGPT</button>
-                <button type="button" class="mode-btn" data-mode="gemini" id="modeGemini">Gemini</button>
+                <button type="button" class="mode-btn active" data-mode="template" id="modeTemplate">Local</button>
+                <button type="button" class="mode-btn" data-mode="ondevice" id="modeOnDevice">Gemini Nano</button>
             </div>
-            <div class="gemini-status" id="geminiStatus"></div>
+            <div class="ai-status" id="aiStatus"></div>
         </div>
-
-        <details class="api-keys" id="apiKeysPanel">
-            <summary data-i18n="apiKeysTitle">API Keys</summary>
-            <div class="api-keys-body">
-                <label for="openaiApiKey" data-i18n="openaiKeyLabel">OpenAI API key</label>
-                <input type="password" id="openaiApiKey" autocomplete="off" spellcheck="false" placeholder="sk-...">
-                <p class="key-help" id="openaiKeyHelp"></p>
-                <label for="geminiApiKey" data-i18n="geminiKeyLabel">Gemini API key</label>
-                <input type="password" id="geminiApiKey" autocomplete="off" spellcheck="false" placeholder="AIza...">
-                <p class="key-help" id="geminiKeyHelp"></p>
-                <button type="button" id="saveKeys">Save keys</button>
-            </div>
-        </details>
 
         <div class="rating-container">
             <label data-i18n="ratingLabel">Your Rating</label>
@@ -371,13 +308,10 @@
         </div>
 
         <div id="result"></div>
-
-        <div class="success-message" id="successMessage" style="display: none;" data-i18n="successMessage">
-            Comment confirmed successfully!
-        </div>
     </div>
 
     <script src="translations.js"></script>
+    <script src="ai.js"></script>
     <script src="popup.js"></script>
 </body>
 </html>

@@ -23,68 +23,197 @@ function showEasyCommentButtonError(button, message) {
     }, 3500);
 }
 
-// Add button next to the "Subscribe" button
-function addEasyCommentButton() {
-    const subscribeButtonContainer = document.querySelector('#subscribe-button');
+function isWatchPage() {
+    return location.pathname === '/watch' || /[?&]v=/.test(location.search);
+}
 
-    // Create button if it doesn't exist
-    if (!document.querySelector('#easyCommentButton')) {
-        const button = document.createElement('button');
-        button.id = 'easyCommentButton';
-        button.className = 'easy-comment-button';
-        button.type = 'button';
-        button.setAttribute('aria-label', 'Generate AI comment');
-        setEasyCommentButtonIcon(button);
+/** Only real Subscribe controls — never early empty shells like #actions. */
+function findSubscribeAnchor() {
+    const candidates = [
+        document.querySelector('ytd-watch-metadata #owner #subscribe-button'),
+        document.querySelector('#owner #subscribe-button'),
+        document.querySelector('ytd-watch-metadata #subscribe-button'),
+        document.querySelector('#subscribe-button'),
+        document.querySelector('ytd-subscribe-button-renderer')
+    ];
 
-        button.addEventListener('click', async () => {
-            button.innerHTML = '<span class="spinner"></span>';
-            button.disabled = true;
-            button.classList.remove('error');
-            let failed = false;
+    for (const el of candidates) {
+        if (!el || !el.isConnected) continue;
+        // Ignore tiny/hidden placeholders that YouTube mounts before the real control
+        const rect = el.getBoundingClientRect();
+        if (rect.width < 8 && rect.height < 8) continue;
+        return el;
+    }
+    return null;
+}
 
-            try {
-                const response = await chrome.runtime.sendMessage({
-                    action: 'generateComment',
-                    rating: 5,
-                    mode: 'ondevice'
-                });
+function isButtonProperlyMounted(button, subscribe) {
+    if (!button || !button.isConnected || !subscribe || !subscribe.isConnected) {
+        return false;
+    }
+    return (
+        button.previousElementSibling === subscribe ||
+        subscribe.nextElementSibling === button ||
+        (subscribe.parentElement && subscribe.parentElement.contains(button))
+    );
+}
 
-                if (!response || !response.success || !response.comment) {
-                    failed = true;
-                    const message =
-                        (response && response.error) ||
-                        'AI comment failed. Check Gemini Nano availability.';
-                    console.error('Failed to generate AI comment:', message);
-                    button.innerHTML = AI_BUTTON_ICON;
-                    showEasyCommentButtonError(button, message);
-                    return;
-                }
+function createEasyCommentButton() {
+    const button = document.createElement('button');
+    button.id = 'easyCommentButton';
+    button.className = 'easy-comment-button';
+    button.type = 'button';
+    button.setAttribute('aria-label', 'Generate AI comment');
+    setEasyCommentButtonIcon(button);
 
-                await postCommentToYoutube(response.comment, false);
-                console.log('AI comment posted successfully');
-                setEasyCommentButtonIcon(button);
-                button.title = 'AI comment posted';
-            } catch (error) {
+    button.addEventListener('click', async () => {
+        button.innerHTML = '<span class="spinner"></span>';
+        button.disabled = true;
+        button.classList.remove('error');
+        let failed = false;
+
+        try {
+            const response = await chrome.runtime.sendMessage({
+                action: 'generateComment',
+                rating: 5,
+                mode: 'ondevice'
+            });
+
+            if (!response || !response.success || !response.comment) {
                 failed = true;
-                console.error('Failed to post AI comment from in-page button:', error);
+                const message =
+                    (response && response.error) ||
+                    'AI comment failed. Check Gemini Nano availability.';
+                console.error('Failed to generate AI comment:', message);
                 button.innerHTML = AI_BUTTON_ICON;
-                showEasyCommentButtonError(
-                    button,
-                    'AI comment failed. Please try again.'
-                );
-            } finally {
-                if (!failed) {
-                    setEasyCommentButtonIcon(button);
-                }
-                button.disabled = false;
+                showEasyCommentButtonError(button, message);
+                return;
             }
-        });
 
-        if (subscribeButtonContainer) {
-            subscribeButtonContainer.insertAdjacentElement('afterend', button);
+            await postCommentToYoutube(response.comment, false);
+            console.log('AI comment posted successfully');
+            setEasyCommentButtonIcon(button);
+            button.title = 'AI comment posted';
+        } catch (error) {
+            failed = true;
+            console.error('Failed to post AI comment from in-page button:', error);
+            button.innerHTML = AI_BUTTON_ICON;
+            showEasyCommentButtonError(button, 'AI comment failed. Please try again.');
+        } finally {
+            if (!failed) {
+                setEasyCommentButtonIcon(button);
+            }
+            button.disabled = false;
         }
+    });
+
+    return button;
+}
+
+/**
+ * Mount button immediately after Subscribe.
+ * Returns true only when the button is correctly placed next to Subscribe.
+ */
+function ensureEasyCommentButton() {
+    try {
+        if (!isWatchPage()) {
+            const stray = document.getElementById('easyCommentButton');
+            if (stray) stray.remove();
+            return false;
+        }
+
+        const subscribe = findSubscribeAnchor();
+        if (!subscribe) {
+            // Remove orphan buttons left in wiped containers
+            const orphan = document.getElementById('easyCommentButton');
+            if (orphan && !orphan.closest('#owner, ytd-watch-metadata')) {
+                orphan.remove();
+            }
+            return false;
+        }
+
+        let button = document.getElementById('easyCommentButton');
+
+        if (!button) {
+            button = createEasyCommentButton();
+            subscribe.insertAdjacentElement('afterend', button);
+            return isButtonProperlyMounted(button, subscribe);
+        }
+
+        if (!isButtonProperlyMounted(button, subscribe)) {
+            subscribe.insertAdjacentElement('afterend', button);
+        }
+
+        return isButtonProperlyMounted(button, subscribe);
+    } catch (error) {
+        console.error('Failed to ensure Easy Comment button:', error);
+        return false;
     }
 }
+
+let ensureScheduled = false;
+function scheduleEnsureEasyCommentButton() {
+    if (ensureScheduled) return;
+    ensureScheduled = true;
+    requestAnimationFrame(() => {
+        ensureScheduled = false;
+        ensureEasyCommentButton();
+    });
+}
+
+function startButtonMountWatchers() {
+    ensureEasyCommentButton();
+
+    // Keep trying forever on watch pages — YouTube often remounts Subscribe late
+    // and also destroys injected nodes during hydration.
+    setInterval(() => {
+        if (!isWatchPage()) return;
+        if (!ensureEasyCommentButton()) {
+            // try again sooner on failure
+        }
+    }, 800);
+
+    const ytEvents = [
+        'yt-navigate-finish',
+        'yt-page-data-updated',
+        'yt-navigate-start',
+        'yt-page-type-changed',
+        'yt-player-updated'
+    ];
+    ytEvents.forEach((eventName) => {
+        document.addEventListener(eventName, () => {
+            ensureEasyCommentButton();
+            let burst = 0;
+            const burstId = setInterval(() => {
+                burst += 1;
+                if (ensureEasyCommentButton() || burst >= 25) {
+                    clearInterval(burstId);
+                }
+            }, 300);
+        }, true);
+    });
+
+    let lastHref = location.href;
+    setInterval(() => {
+        if (location.href !== lastHref) {
+            lastHref = location.href;
+            ensureEasyCommentButton();
+        }
+    }, 500);
+
+    const root = document.documentElement;
+    if (root) {
+        const observer = new MutationObserver(() => {
+            scheduleEnsureEasyCommentButton();
+        });
+        observer.observe(root, {
+            childList: true,
+            subtree: true
+        });
+    }
+}
+
+startButtonMountWatchers();
 
 function getTextContent(selector) {
     const el = document.querySelector(selector);
@@ -150,11 +279,14 @@ function getVideoContext() {
     }
 }
 
-// Initial button addition
-addEasyCommentButton();
-
 // Listen for messages from popup / background
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === 'ensureEasyCommentButton') {
+        const ok = ensureEasyCommentButton();
+        sendResponse({ success: ok });
+        return false;
+    }
+
     if (request.action === 'postComment') {
         postCommentToYoutube(request.comment, request.preview)
             .then(() => {
@@ -237,13 +369,3 @@ async function postCommentToYoutube(comment, preview = false) {
         throw new Error(error.message);
     }
 }
-
-// Watch for page navigation
-const observer = new MutationObserver(() => {
-    addEasyCommentButton();
-});
-
-observer.observe(document.body, {
-    childList: true,
-    subtree: true
-});

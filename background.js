@@ -217,3 +217,55 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
     return false;
 });
+
+function isYouTubeWatchUrl(url) {
+    try {
+        const parsed = new URL(url);
+        return (
+            (parsed.hostname === 'www.youtube.com' || parsed.hostname === 'youtube.com') &&
+            parsed.pathname === '/watch'
+        );
+    } catch (error) {
+        return false;
+    }
+}
+
+async function pingContentScriptToMountButton(tabId) {
+    try {
+        await chrome.tabs.sendMessage(tabId, { action: 'ensureEasyCommentButton' });
+    } catch (error) {
+        // Content script may not be ready yet; retry a few times
+        console.error('Ping ensureEasyCommentButton failed, retrying:', error);
+        for (let i = 0; i < 8; i += 1) {
+            await new Promise((resolve) => setTimeout(resolve, 500));
+            try {
+                await chrome.tabs.sendMessage(tabId, { action: 'ensureEasyCommentButton' });
+                return;
+            } catch (retryError) {
+                // keep trying
+            }
+        }
+    }
+}
+
+function handlePossibleWatchNavigation(details) {
+    if (!details || details.frameId !== 0 || !details.url || !isYouTubeWatchUrl(details.url)) {
+        return;
+    }
+    pingContentScriptToMountButton(details.tabId);
+}
+
+if (chrome.webNavigation) {
+    chrome.webNavigation.onCompleted.addListener(handlePossibleWatchNavigation, {
+        url: [{ hostEquals: 'www.youtube.com', pathEquals: '/watch' }]
+    });
+    chrome.webNavigation.onHistoryStateUpdated.addListener(handlePossibleWatchNavigation, {
+        url: [{ hostEquals: 'www.youtube.com', pathPrefix: '/watch' }]
+    });
+}
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    if (changeInfo.status === 'complete' && tab.url && isYouTubeWatchUrl(tab.url)) {
+        pingContentScriptToMountButton(tabId);
+    }
+});

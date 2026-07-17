@@ -281,6 +281,23 @@
             padding: 8px;
         }
 
+        .key-help {
+            font-size: 11px;
+            color: var(--muted-color);
+            line-height: 1.4;
+            margin: -2px 0 4px;
+        }
+
+        .key-help a {
+            color: var(--primary-color);
+            text-decoration: underline;
+            cursor: pointer;
+        }
+
+        .key-help a:hover {
+            opacity: 0.85;
+        }
+
         .comment-text {
             font-size: 16px;
             line-height: 1.2;
@@ -325,8 +342,10 @@
             <div class="api-keys-body">
                 <label for="openaiApiKey" data-i18n="openaiKeyLabel">OpenAI API key</label>
                 <input type="password" id="openaiApiKey" autocomplete="off" spellcheck="false" placeholder="sk-...">
+                <p class="key-help" id="openaiKeyHelp"></p>
                 <label for="geminiApiKey" data-i18n="geminiKeyLabel">Gemini API key</label>
                 <input type="password" id="geminiApiKey" autocomplete="off" spellcheck="false" placeholder="AIza...">
+                <p class="key-help" id="geminiKeyHelp"></p>
                 <button type="button" id="saveKeys">Save keys</button>
             </div>
         </details>

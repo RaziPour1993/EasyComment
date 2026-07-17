@@ -142,10 +142,46 @@ document.addEventListener('DOMContentLoaded', () => {
         const modeTemplate = document.getElementById('modeTemplate');
         const modeChatGpt = document.getElementById('modeChatGpt');
         const modeGemini = document.getElementById('modeGemini');
+
         if (modeTemplate) modeTemplate.textContent = translations.modeTemplate;
         if (modeChatGpt) modeChatGpt.textContent = translations.modeChatGpt;
         if (modeGemini) modeGemini.textContent = translations.modeGemini;
         if (saveKeysButton) saveKeysButton.textContent = translations.saveKeysButton;
+
+        setupKeyHelp(
+            'openaiKeyHelp',
+            translations.openaiKeyHelp,
+            translations.openaiKeyLinkText,
+            'https://platform.openai.com/api-keys'
+        );
+        setupKeyHelp(
+            'geminiKeyHelp',
+            translations.geminiKeyHelp,
+            translations.geminiKeyLinkText,
+            'https://aistudio.google.com/apikey'
+        );
+    }
+
+    function setupKeyHelp(containerId, helpText, linkText, url) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+
+        container.textContent = '';
+        container.appendChild(document.createTextNode(`${helpText} `));
+
+        const link = document.createElement('a');
+        link.href = url;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.textContent = linkText;
+        link.addEventListener('click', (event) => {
+            event.preventDefault();
+            chrome.tabs.create({ url }).catch((error) => {
+                console.error('Failed to open API key help link:', error);
+                window.open(url, '_blank', 'noopener,noreferrer');
+            });
+        });
+        container.appendChild(link);
     }
 
     async function loadSettings() {

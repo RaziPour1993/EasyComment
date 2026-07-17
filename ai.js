@@ -135,7 +135,6 @@ function detectPersianOrArabic(text) {
 function buildCommentPrompt(rating, videoContext) {
     const context = videoContext || {};
     const title = (context.title || '').trim();
-    const channel = (context.channel || '').trim();
     const description = (context.description || '').trim();
     const languageName = detectCommentLanguageFromTitle(title);
 
@@ -144,6 +143,8 @@ function buildCommentPrompt(rating, videoContext) {
             'Write a short, natural YouTube comment in English only.',
             `The viewer rated this video ${rating}/5 stars (${RATING_LABELS[rating] || 'unknown'}).`,
             'Match the tone to the rating. Sound like a real person.',
+            'Do NOT mention any person\'s name or channel name.',
+            'Keep it a general comment about the video content.',
             'Do not use hashtag spam. Do not wrap the comment in quotes.',
             'Return ONLY the comment text.'
         ].join('\n');
@@ -160,13 +161,14 @@ function buildCommentPrompt(rating, videoContext) {
             ? 'Do NOT write in Arabic. The comment must be Persian/Farsi.'
             : '',
         `The viewer rated this video ${rating}/5 stars (${RATING_LABELS[rating] || 'unknown'}).`,
-        'CRITICAL TOPIC: The comment MUST be specifically about THIS video, based on its title.',
+        'CRITICAL TOPIC: Comment on the general topic of this video, based on its title.',
         `Video title: "${title}"`,
-        channel ? `Channel: ${channel}` : '',
         description ? `Description snippet: ${description}` : '',
-        'Mention or clearly refer to the topic, subject, or content suggested by the title.',
-        'Do NOT write a generic comment that could fit any video.',
-        'Do NOT ignore the title. Use details from the title (names, topics, products, games, tutorials, etc.).',
+        'Talk about the subject/topic in a general way.',
+        'Do NOT mention any person\'s name, creator name, channel name, celebrity name, or proper names of people.',
+        'Do NOT address anyone by name (no "@", no greetings with names).',
+        'Even if the title contains a person\'s name, do not repeat it — paraphrase the topic instead.',
+        'Keep it a general viewer comment about the content only.',
         'Match the tone to the star rating. Sound like a real person, not marketing copy.',
         '1 or 2 short sentences max.',
         'Do not use hashtag spam. Do not wrap the comment in quotes.',

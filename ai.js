@@ -71,16 +71,36 @@ async function generateChatGptComment(rating, videoContext, apiKey) {
     }
 
     const prompt = buildCommentPrompt(rating, videoContext);
+    const models = ['gpt-4o-mini', 'gpt-4.1-mini', 'gpt-3.5-turbo'];
+    let lastError = null;
+
+    for (const model of models) {
+        try {
+            return await requestOpenAiChatCompletion(apiKey.trim(), model, prompt);
+        } catch (error) {
+            lastError = error;
+            // Only retry with another model when the current model is unavailable
+            if (error.message !== 'OPENAI_MODEL') {
+                throw error;
+            }
+            console.error(`OpenAI model unavailable (${model}), trying next fallback`);
+        }
+    }
+
+    throw lastError || new Error('OPENAI_API');
+}
+
+async function requestOpenAiChatCompletion(apiKey, model, prompt) {
     let response;
     try {
         response = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                Authorization: `Bearer ${apiKey.trim()}`
+                Authorization: `Bearer ${apiKey}`
             },
             body: JSON.stringify({
-                model: 'gpt-4o-mini',
+                model,
                 messages: [
                     {
                         role: 'system',
@@ -97,21 +117,19 @@ async function generateChatGptComment(rating, videoContext, apiKey) {
         throw new Error('OPENAI_NETWORK');
     }
 
-    if (!response.ok) {
-        const status = response.status;
-        console.error('OpenAI API error status:', status);
-        if (status === 401 || status === 403) {
-            throw new Error('OPENAI_AUTH');
-        }
-        throw new Error('OPENAI_API');
-    }
-
-    let data;
+    let data = null;
     try {
         data = await response.json();
     } catch (error) {
         console.error('OpenAI JSON parse error:', error);
+        if (!response.ok) {
+            throw classifyOpenAiHttpError(response.status, null);
+        }
         throw new Error('OPENAI_API');
+    }
+
+    if (!response.ok) {
+        throw classifyOpenAiHttpError(response.status, data);
     }
 
     const comment = cleanAiComment(data?.choices?.[0]?.message?.content);
@@ -119,6 +137,45 @@ async function generateChatGptComment(rating, videoContext, apiKey) {
         throw new Error('EMPTY_AI_RESPONSE');
     }
     return comment;
+}
+
+function classifyOpenAiHttpError(status, data) {
+    const apiError = data && data.error ? data.error : {};
+    const code = String(apiError.code || apiError.type || '').toLowerCase();
+    const message = String(apiError.message || '').toLowerCase();
+
+    console.error('OpenAI API error:', status, code || '(no code)', message.slice(0, 200));
+
+    if (status === 401 || status === 403 || code.includes('invalid_api_key')) {
+        return new Error('OPENAI_AUTH');
+    }
+
+    if (
+        status === 429 ||
+        code.includes('insufficient_quota') ||
+        code.includes('quota') ||
+        message.includes('quota') ||
+        message.includes('billing')
+    ) {
+        if (code.includes('rate_limit') || message.includes('rate limit')) {
+            return new Error('OPENAI_RATE_LIMIT');
+        }
+        return new Error('OPENAI_QUOTA');
+    }
+
+    if (
+        status === 404 ||
+        code.includes('model_not_found') ||
+        message.includes('model') && (message.includes('does not exist') || message.includes('not found') || message.includes('access'))
+    ) {
+        return new Error('OPENAI_MODEL');
+    }
+
+    if (status === 400 && (message.includes('model') || code.includes('model'))) {
+        return new Error('OPENAI_MODEL');
+    }
+
+    return new Error('OPENAI_API');
 }
 
 async function isBuiltInAiAvailable() {

@@ -13,24 +13,65 @@
     justify-content: center;
     align-items: center;
     margin: 0 4px;
-    transition: background-color 0.2s, border-color 0.2s;
+    transition: background-color 0.2s, border-color 0.2s, transform 0.15s;
     vertical-align: middle;
 }
 
 .easy-comment-button:hover {
     background-color: var(--yt-button-hover-bg, #e8e8e8);
     border-color: var(--yt-button-hover-border, #c6c6c6);
+    transform: scale(1.05);
 }
 
-.easy-comment-button .icon {
-    font-size: 18px;
+.easy-comment-button:disabled {
+    opacity: 0.7;
+    cursor: wait;
+    transform: none;
+}
+
+.easy-comment-button .icon-svg {
+    width: 22px;
+    height: 22px;
+    display: block;
+}
+
+.easy-comment-button .icon-svg .bubble-fill {
+    fill: currentColor;
+    opacity: 0.92;
+}
+
+.easy-comment-button .icon-svg .spark-main {
+    fill: #3ea6ff;
+}
+
+.easy-comment-button .icon-svg .spark-small {
+    fill: #7dc4ff;
+}
+
+.easy-comment-button:hover .icon-svg .spark-main,
+.easy-comment-button:hover .icon-svg .spark-small {
+    fill: #65b8ff;
+}
+
+.easy-comment-button.error {
+    border-color: #f44336;
+}
+
+.easy-comment-button.error .icon-svg .bubble-fill {
+    fill: #f44336;
+    opacity: 1;
+}
+
+.easy-comment-button.error .icon-svg .spark-main,
+.easy-comment-button.error .icon-svg .spark-small {
+    fill: #ff8a80;
 }
 
 .easy-comment-button .spinner {
     width: 18px;
     height: 18px;
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    border-top: 2px solid #fff;
+    border: 2px solid rgba(33, 150, 243, 0.25);
+    border-top: 2px solid #2196F3;
     border-radius: 50%;
     animation: spin 1s linear infinite;
 }

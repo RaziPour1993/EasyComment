@@ -61,9 +61,50 @@ async function resolveYouTubeTab(sender) {
     return getActiveYouTubeTab();
 }
 
+async function hasOffscreenDocument() {
+    try {
+        if (chrome.runtime.getContexts) {
+            const contexts = await chrome.runtime.getContexts({
+                contextTypes: ['OFFSCREEN_DOCUMENT']
+            });
+            return contexts.length > 0;
+        }
+        if (chrome.offscreen && chrome.offscreen.hasDocument) {
+            return chrome.offscreen.hasDocument();
+        }
+    } catch (error) {
+        console.error('Failed to check offscreen document:', error);
+    }
+    return false;
+}
+
+async function ensureOffscreenDocument() {
+    if (await hasOffscreenDocument()) {
+        return;
+    }
+
+    await chrome.offscreen.createDocument({
+        url: 'offscreen.html',
+        reasons: ['DOM_SCRAPING'],
+        justification: 'Run Gemini Nano Prompt API to generate YouTube comments'
+    });
+}
+
+async function generateOnDeviceViaOffscreen(rating, videoContext) {
+    await ensureOffscreenDocument();
+    const response = await chrome.runtime.sendMessage({
+        target: 'offscreen',
+        action: 'generateOnDevice',
+        rating,
+        videoContext
+    });
+    return response;
+}
+
 async function handleGenerateComment(request, sender) {
     const rating = request.rating;
     const storedMode = await getStoredMode();
+    // In-page button can force AI with request.mode === 'ondevice'
     const mode = request.mode || storedMode;
 
     if (!rating || rating < 1 || rating > 5) {
@@ -80,6 +121,42 @@ async function handleGenerateComment(request, sender) {
         videoContext = await fetchVideoContext(tab.id);
         if (!videoContext.title && tab.title) {
             videoContext.title = String(tab.title).replace(/ - YouTube$/i, '').trim();
+        }
+
+        try {
+            // Prefer offscreen page — LanguageModel is more reliable there than in the SW.
+            const offscreenResult = await generateOnDeviceViaOffscreen(rating, videoContext);
+            if (offscreenResult && offscreenResult.success && offscreenResult.comment) {
+                return {
+                    success: true,
+                    comment: offscreenResult.comment,
+                    mode: AI_MODES.ONDEVICE,
+                    source: AI_MODES.ONDEVICE
+                };
+            }
+
+            const code = (offscreenResult && offscreenResult.errorCode) || 'BUILTIN_FAILED';
+            return {
+                success: false,
+                error: (offscreenResult && offscreenResult.error) || mapErrorToMessage(code),
+                errorCode: code,
+                mode
+            };
+        } catch (error) {
+            console.error('Offscreen on-device path failed, trying service worker:', error);
+            try {
+                const result = await generateComment(mode, rating, videoContext);
+                return {
+                    success: true,
+                    comment: result.comment,
+                    mode: result.source,
+                    source: result.source
+                };
+            } catch (fallbackError) {
+                const code = fallbackError && fallbackError.message ? fallbackError.message : 'UNKNOWN';
+                console.error('generateComment failed:', code, 'mode=', mode);
+                return { success: false, error: mapErrorToMessage(code), errorCode: code, mode };
+            }
         }
     }
 
@@ -99,6 +176,11 @@ async function handleGenerateComment(request, sender) {
 }
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    // Ignore messages meant for the offscreen document
+    if (request.target === 'offscreen') {
+        return false;
+    }
+
     if (request.action === 'generateComment') {
         handleGenerateComment(request, sender)
             .then(sendResponse)
@@ -110,11 +192,25 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 
     if (request.action === 'getBuiltInAiStatus') {
-        getBuiltInAiStatus()
-            .then((status) => sendResponse({ success: true, status }))
-            .catch((error) => {
-                console.error('getBuiltInAiStatus failed:', error);
-                sendResponse({ success: false, status: 'unavailable' });
+        ensureOffscreenDocument()
+            .then(() =>
+                chrome.runtime.sendMessage({
+                    target: 'offscreen',
+                    action: 'getBuiltInAiStatus'
+                })
+            )
+            .then((response) => {
+                sendResponse(response || { success: false, status: 'unavailable' });
+            })
+            .catch(async (error) => {
+                console.error('Offscreen status failed, checking in SW:', error);
+                try {
+                    const status = await getBuiltInAiStatus();
+                    sendResponse({ success: true, status });
+                } catch (fallbackError) {
+                    console.error('getBuiltInAiStatus failed:', fallbackError);
+                    sendResponse({ success: false, status: 'unavailable' });
+                }
             });
         return true;
     }

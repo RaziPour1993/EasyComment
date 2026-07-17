@@ -1,3 +1,28 @@
+const AI_BUTTON_ICON = `
+<svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+  <path class="bubble-fill" d="M4.5 5.75c0-.97.78-1.75 1.75-1.75h11.5c.97 0 1.75.78 1.75 1.75v8c0 .97-.78 1.75-1.75 1.75h-4.86L8.2 19.4a.7.7 0 0 1-1.15-.53v-3.37H6.25c-.97 0-1.75-.78-1.75-1.75v-8z"/>
+  <path class="spark-main" d="M15.9 7.15l.85 2.35 2.35.85-2.35.85-.85 2.35-.85-2.35-2.35-.85 2.35-.85.85-2.35z"/>
+  <path class="spark-small" d="M19.05 11.35l.42 1.15 1.15.42-1.15.42-.42 1.15-.42-1.15-1.15-.42 1.15-.42.42-1.15z"/>
+</svg>
+`.trim();
+
+function setEasyCommentButtonIcon(button) {
+    button.innerHTML = AI_BUTTON_ICON;
+    button.classList.remove('error');
+    button.title = 'Generate AI comment with Gemini Nano';
+}
+
+function showEasyCommentButtonError(button, message) {
+    button.classList.add('error');
+    button.title = message || 'AI comment failed';
+    setTimeout(() => {
+        if (button && button.isConnected) {
+            button.classList.remove('error');
+            button.title = 'Generate AI comment with Gemini Nano';
+        }
+    }, 3500);
+}
+
 // Add button next to the "Subscribe" button
 function addEasyCommentButton() {
     const subscribeButtonContainer = document.querySelector('#subscribe-button');
@@ -7,29 +32,50 @@ function addEasyCommentButton() {
         const button = document.createElement('button');
         button.id = 'easyCommentButton';
         button.className = 'easy-comment-button';
-        button.innerHTML = '<span class="icon">💬</span>';
+        button.type = 'button';
+        button.setAttribute('aria-label', 'Generate AI comment');
+        setEasyCommentButtonIcon(button);
 
         button.addEventListener('click', async () => {
             button.innerHTML = '<span class="spinner"></span>';
             button.disabled = true;
+            button.classList.remove('error');
+            let failed = false;
 
             try {
                 const response = await chrome.runtime.sendMessage({
                     action: 'generateComment',
-                    rating: 5
+                    rating: 5,
+                    mode: 'ondevice'
                 });
 
                 if (!response || !response.success || !response.comment) {
-                    console.error('Failed to generate comment:', response && response.error);
+                    failed = true;
+                    const message =
+                        (response && response.error) ||
+                        'AI comment failed. Check Gemini Nano availability.';
+                    console.error('Failed to generate AI comment:', message);
+                    button.innerHTML = AI_BUTTON_ICON;
+                    showEasyCommentButtonError(button, message);
                     return;
                 }
 
                 await postCommentToYoutube(response.comment, false);
-                console.log('Comment posted successfully');
+                console.log('AI comment posted successfully');
+                setEasyCommentButtonIcon(button);
+                button.title = 'AI comment posted';
             } catch (error) {
-                console.error('Failed to post comment from in-page button:', error);
+                failed = true;
+                console.error('Failed to post AI comment from in-page button:', error);
+                button.innerHTML = AI_BUTTON_ICON;
+                showEasyCommentButtonError(
+                    button,
+                    'AI comment failed. Please try again.'
+                );
             } finally {
-                button.innerHTML = '<span class="icon">💬</span>';
+                if (!failed) {
+                    setEasyCommentButtonIcon(button);
+                }
                 button.disabled = false;
             }
         });

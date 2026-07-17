@@ -140,9 +140,10 @@ function buildCommentPrompt(rating, videoContext) {
 
     if (!title) {
         return [
-            'Write a short, natural YouTube comment in English only.',
+            'Write a short, casual YouTube comment in English only.',
             `The viewer rated this video ${rating}/5 stars (${RATING_LABELS[rating] || 'unknown'}).`,
-            'Match the tone to the rating. Sound like a real person.',
+            'Tone: conversational and informal — like a normal viewer chatting, NOT formal or academic.',
+            'Avoid stiff or overly polite wording. Everyday spoken language is best.',
             'Do NOT mention any person\'s name or channel name.',
             'Keep it a general comment about the video content.',
             'Do not use hashtag spam. Do not wrap the comment in quotes.',
@@ -151,7 +152,7 @@ function buildCommentPrompt(rating, videoContext) {
     }
 
     return [
-        'Write a short, natural YouTube comment.',
+        'Write a short, casual YouTube comment.',
         `CRITICAL LANGUAGE: Write the ENTIRE comment in ${languageName}.`,
         languageName === 'Persian'
             ? 'Use Persian (Farsi) script and wording — NOT Arabic.'
@@ -160,6 +161,10 @@ function buildCommentPrompt(rating, videoContext) {
         languageName === 'Persian'
             ? 'Do NOT write in Arabic. The comment must be Persian/Farsi.'
             : '',
+        languageName === 'Persian'
+            ? 'Tone: خیلی محاوره‌ای و خودمونی بنویس؛ رسمی، ادبی یا کتابی نباشد. مثل حرف زدن معمولی مردم در کامنت یوتیوب.'
+            : 'Tone: conversational and informal — like a real viewer chatting under a video, NOT formal, stiff, or academic.',
+        'Avoid corporate, marketing, or essay-like language. Everyday spoken style is required.',
         `The viewer rated this video ${rating}/5 stars (${RATING_LABELS[rating] || 'unknown'}).`,
         'CRITICAL TOPIC: Comment on the general topic of this video, based on its title.',
         `Video title: "${title}"`,
@@ -169,7 +174,7 @@ function buildCommentPrompt(rating, videoContext) {
         'Do NOT address anyone by name (no "@", no greetings with names).',
         'Even if the title contains a person\'s name, do not repeat it — paraphrase the topic instead.',
         'Keep it a general viewer comment about the content only.',
-        'Match the tone to the star rating. Sound like a real person, not marketing copy.',
+        'Match the tone to the star rating, but stay casual either way.',
         '1 or 2 short sentences max.',
         'Do not use hashtag spam. Do not wrap the comment in quotes.',
         'Return ONLY the comment text — no preamble, no explanation.'

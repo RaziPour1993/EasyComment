@@ -272,6 +272,25 @@
         #previewComment {
             background: var(--preview-button-color);
         }
+
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin-top: 2px;
+        }
+
+        .footer-links a {
+            color: var(--primary-color);
+            font-size: 12px;
+            font-weight: bold;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .footer-links a:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
@@ -308,6 +327,10 @@
         </div>
 
         <div id="result"></div>
+
+        <div class="footer-links">
+            <a href="#" id="aboutLink">About</a>
+        </div>
     </div>
 
     <script src="translations.js"></script>

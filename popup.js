@@ -15,6 +15,19 @@ document.addEventListener('DOMContentLoaded', () => {
     if (modeTemplateBtn) modeTemplateBtn.textContent = translations.modeTemplate;
     if (modeOnDeviceBtn) modeOnDeviceBtn.textContent = translations.modeOnDevice;
 
+    const aboutLink = document.getElementById('aboutLink');
+    if (aboutLink) {
+        aboutLink.textContent = translations.aboutLink || 'About';
+        aboutLink.addEventListener('click', (event) => {
+            event.preventDefault();
+            const aboutUrl = chrome.runtime.getURL('about.html');
+            chrome.tabs.create({ url: aboutUrl }).catch((error) => {
+                console.error('Failed to open About page:', error);
+                window.open(aboutUrl, '_blank', 'noopener,noreferrer');
+            });
+        });
+    }
+
     const settingsReady = loadSettings();
 
     modeButtons.forEach((btn) => {

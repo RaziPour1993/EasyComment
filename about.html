@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html dir="ltr" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>About Easy Comment</title>
+    <style>
+        :root {
+            --primary-color: #2196F3;
+            --border-radius: 12px;
+        }
+
+        @media (prefers-color-scheme: light) {
+            :root {
+                --text-color: #333;
+                --bg-color: #f4f6f8;
+                --card-bg: #fff;
+                --muted-color: #666;
+                --link-color: #1565C0;
+            }
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --text-color: #f1f1f1;
+                --bg-color: #121212;
+                --card-bg: #1e1e1e;
+                --muted-color: #aaa;
+                --link-color: #64B5F6;
+            }
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, Helvetica, sans-serif;
+            background: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.55;
+        }
+
+        .page {
+            max-width: 640px;
+            margin: 0 auto;
+            padding: 28px 20px 40px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: var(--border-radius);
+            padding: 24px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+        }
+
+        h1 {
+            margin: 0 0 8px;
+            color: var(--primary-color);
+            font-size: 28px;
+            text-align: center;
+        }
+
+        .tagline {
+            margin: 0 0 20px;
+            text-align: center;
+            color: var(--muted-color);
+            font-size: 14px;
+        }
+
+        h2 {
+            margin: 22px 0 10px;
+            font-size: 17px;
+            color: var(--primary-color);
+        }
+
+        p {
+            margin: 0 0 12px;
+            font-size: 14px;
+        }
+
+        ul {
+            margin: 0 0 12px;
+            padding-left: 20px;
+            font-size: 14px;
+        }
+
+        li {
+            margin-bottom: 6px;
+        }
+
+        .links {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 8px;
+        }
+
+        .link-btn {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 12px 14px;
+            border-radius: 10px;
+            text-decoration: none;
+            color: #fff;
+            font-weight: bold;
+            font-size: 14px;
+            transition: transform 0.15s ease, opacity 0.15s ease;
+        }
+
+        .link-btn:hover {
+            transform: translateY(-1px);
+            opacity: 0.95;
+        }
+
+        .link-btn.github {
+            background: linear-gradient(135deg, #333, #111);
+        }
+
+        .link-btn.contact {
+            background: linear-gradient(135deg, #2196F3, #1565C0);
+        }
+
+        .link-btn span.meta {
+            font-weight: normal;
+            font-size: 12px;
+            opacity: 0.9;
+        }
+
+        .footer {
+            margin-top: 18px;
+            text-align: center;
+            font-size: 12px;
+            color: var(--muted-color);
+        }
+
+        .back {
+            display: inline-block;
+            margin-bottom: 14px;
+            color: var(--link-color);
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+            background: none;
+            border: none;
+            padding: 0;
+        }
+
+        .back:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <button type="button" class="back" id="closeAbout">← Close</button>
+
+        <div class="card">
+            <h1>✨ Easy Comment</h1>
+            <p class="tagline">Faster, smarter YouTube comments</p>
+
+            <h2>About the extension</h2>
+            <p>
+                Easy Comment helps you quickly create and post comments on YouTube videos.
+                Choose a star rating, generate a comment, preview it, and post — or use the
+                button next to Subscribe for a one-click AI comment.
+            </p>
+
+            <h2>What you can do</h2>
+            <ul>
+                <li><strong>Local mode</strong> — ready-made comments based on your 1–5 star rating</li>
+                <li><strong>Gemini Nano</strong> — on-device AI comments matched to the video topic and title language (no API key)</li>
+                <li><strong>Preview &amp; post</strong> — review before sending to YouTube</li>
+                <li><strong>In-page button</strong> — generate an AI comment beside Subscribe</li>
+            </ul>
+
+            <h2>Open source</h2>
+            <p>
+                Easy Comment is open source. You can explore the code, report issues, or contribute on GitHub.
+            </p>
+            <div class="links">
+                <a class="link-btn github" id="githubLink" href="https://github.com/RaziPour1993/EasyComment" target="_blank" rel="noopener noreferrer">
+                    <span>GitHub repository</span>
+                    <span class="meta">RaziPour1993/EasyComment</span>
+                </a>
+            </div>
+
+            <h2>Contact</h2>
+            <p>
+                Built by Mohammad Razipour. For questions, feedback, or collaboration:
+            </p>
+            <div class="links">
+                <a class="link-btn contact" id="contactLink" href="https://razipour.ir/" target="_blank" rel="noopener noreferrer">
+                    <span>Contact me</span>
+                    <span class="meta">razipour.ir</span>
+                </a>
+            </div>
+
+            <p class="footer">Easy Comment · Chrome extension for YouTube</p>
+        </div>
+    </div>
+
+    <script src="about.js"></script>
+</body>
+</html>

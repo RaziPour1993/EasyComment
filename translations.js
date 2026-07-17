@@ -14,6 +14,7 @@ const translations = {
     modeLabel: "Generation mode",
     modeTemplate: "Local",
     modeOnDevice: "Gemini Nano",
+    aboutLink: "About",
     aiStatusAvailable: "On-device AI available (no key needed).",
     aiStatusUnavailable: "On-device AI is not available on this Chrome. Enable Prompt API / Gemini Nano, or use Local comments.",
     postingComment: "Posting your comment...",

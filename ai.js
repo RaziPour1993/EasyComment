@@ -306,6 +306,62 @@ async function rememberAiComment(comment) {
     }
 }
 
+/**
+ * In-page button: always English, short, positive thank-you, no video details.
+ * Curated templates — more reliable than Nano for this fixed style.
+ */
+const THANKS_COMMENT_TEMPLATES = [
+    'That was great, thanks!',
+    'Thanks, loved it!',
+    'Awesome watch, thanks!',
+    'Really enjoyed this, thanks!',
+    'Great video, thank you!',
+    'Thanks for this one!',
+    'Loved it, appreciate it!',
+    'Super helpful, thanks!',
+    'That was awesome, thanks!',
+    'Thanks, this was great!',
+    'Really good, thank you!',
+    'Nice one, thanks a lot!',
+    'Thanks, made my day!',
+    'Great stuff, thanks!',
+    'Appreciate this, thanks!',
+    'So good, thank you!',
+    'Thanks, really enjoyed it!',
+    'Excellent watch, thanks!',
+    'Thanks for sharing this!',
+    'Loved watching, thanks!',
+    'This was solid, thanks!',
+    'Thanks, awesome content!',
+    'Really nice, thank you!',
+    'Thanks, keep it up!',
+    'Wonderful, thanks a lot!',
+    'Thanks, that was perfect!',
+    'Great job, thank you!',
+    'Thanks, truly enjoyed this!',
+    'Amazing watch, thanks!',
+    'Thanks, this helped a lot!'
+];
+
+/**
+ * Pick a short English thank-you comment, avoiding recent repeats when possible.
+ * @param {string[]} [recentComments]
+ * @returns {string}
+ */
+function generateThanksComment(recentComments) {
+    const recent = new Set(
+        (Array.isArray(recentComments) ? recentComments : [])
+            .filter((item) => typeof item === 'string')
+            .map((item) => item.trim().toLowerCase())
+    );
+    const fresh = THANKS_COMMENT_TEMPLATES.filter(
+        (item) => !recent.has(item.toLowerCase())
+    );
+    const pool = fresh.length > 0 ? fresh : THANKS_COMMENT_TEMPLATES;
+    const index = Math.floor(Math.random() * pool.length);
+    return pool[index];
+}
+
 function buildUniquenessLines(recentComments) {
     const variationHint = pickPromptVariationHint();
     const recent = Array.isArray(recentComments)
@@ -321,32 +377,7 @@ function buildUniquenessLines(recentComments) {
     ];
 }
 
-/**
- * In-page button: always English, short, positive thank-you, no video details.
- * @param {string[]} [recentComments]
- */
-function buildThanksCommentPrompt(recentComments) {
-    return [
-        'Write a roughly 5-word YouTube comment in English only.',
-        'CRITICAL LANGUAGE: Write the ENTIRE comment in English.',
-        'Tone: short, positive, and thankful — like “that was great, thanks” or “thanks, loved it”.',
-        'CRITICAL STYLE: A brief praise + thank-you. Simple and natural.',
-        'CRITICAL: Keep it GENERAL — do NOT mention the video topic, title, subject, facts, or anything specific from the video.',
-        'Do NOT mention any person\'s name, creator name, channel name, or proper names.',
-        'Do NOT address anyone by name (no "@").',
-        'Vibe examples (do not copy verbatim): that was great thanks / thanks that was awesome / loved it thanks / awesome video thanks',
-        'Length: about 5 words total. Keep it very brief.',
-        ...buildUniquenessLines(recentComments),
-        'Do not use hashtag spam. Do not wrap the comment in quotes.',
-        'Return ONLY the comment text — no preamble, no explanation.'
-    ].filter(Boolean).join('\n');
-}
-
-function buildCommentPrompt(rating, videoContext, prefs, recentComments, options) {
-    if (options && options.promptVariant === 'thanks') {
-        return buildThanksCommentPrompt(recentComments);
-    }
-
+function buildCommentPrompt(rating, videoContext, prefs, recentComments) {
     const context = videoContext || {};
     const title = (context.title || '').trim();
     const description = (context.description || '').trim();
@@ -535,11 +566,9 @@ async function createLanguageModelSession() {
     }
 }
 
-async function generateOnDeviceComment(rating, videoContext, prefs, options) {
+async function generateOnDeviceComment(rating, videoContext, prefs) {
     const safeRating = Math.min(5, Math.max(1, Number(rating) || 1));
     const commentPrefs = normalizeCommentPrefs(prefs);
-    const promptOptions =
-        options && options.promptVariant === 'thanks' ? { promptVariant: 'thanks' } : {};
 
     try {
         if (typeof LanguageModel === 'undefined') {
@@ -568,21 +597,16 @@ async function generateOnDeviceComment(rating, videoContext, prefs, options) {
                 safeRating,
                 videoContext,
                 commentPrefs,
-                recentComments,
-                promptOptions
+                recentComments
             );
             const title = (videoContext && videoContext.title) || '';
             console.log(
                 'Gemini Nano prompt language:',
-                promptOptions.promptVariant === 'thanks'
-                    ? 'English (thanks)'
-                    : resolveCommentLanguage(title, commentPrefs),
+                resolveCommentLanguage(title, commentPrefs),
                 '| prefs:',
                 commentPrefs.language,
                 commentPrefs.length,
                 commentPrefs.tone,
-                '| variant:',
-                promptOptions.promptVariant || 'default',
                 '| title:',
                 title.slice(0, 80) || '(missing)'
             );
@@ -621,13 +645,16 @@ async function generateComment(mode, rating, videoContext, prefs, options) {
     const safeRating = Math.min(5, Math.max(1, Number(rating) || 1));
     const normalizedMode = String(mode || '').trim().toLowerCase();
 
+    // In-page button: curated short English thank-you (no Nano / no video topic).
+    if (options && options.promptVariant === 'thanks') {
+        const recentComments = await loadRecentAiComments();
+        const comment = generateThanksComment(recentComments);
+        await rememberAiComment(comment);
+        return { comment, source: AI_MODES.ONDEVICE };
+    }
+
     if (normalizedMode === AI_MODES.ONDEVICE) {
-        const comment = await generateOnDeviceComment(
-            safeRating,
-            videoContext,
-            prefs,
-            options
-        );
+        const comment = await generateOnDeviceComment(safeRating, videoContext, prefs);
         return { comment, source: AI_MODES.ONDEVICE };
     }
 

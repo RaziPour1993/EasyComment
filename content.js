@@ -9,7 +9,7 @@ const AI_BUTTON_ICON = `
 function setEasyCommentButtonIcon(button) {
     button.innerHTML = AI_BUTTON_ICON;
     button.classList.remove('error');
-    button.title = 'Generate AI comment with Gemini Nano';
+    button.title = 'Post a short English thank-you comment';
 }
 
 function showEasyCommentButtonError(button, message) {
@@ -18,7 +18,7 @@ function showEasyCommentButtonError(button, message) {
     setTimeout(() => {
         if (button && button.isConnected) {
             button.classList.remove('error');
-            button.title = 'Generate AI comment with Gemini Nano';
+            button.title = 'Post a short English thank-you comment';
         }
     }, 3500);
 }

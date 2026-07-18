@@ -100,15 +100,14 @@ async function ensureOffscreenDocument() {
     });
 }
 
-async function generateOnDeviceViaOffscreen(rating, videoContext, commentPrefs, options) {
+async function generateOnDeviceViaOffscreen(rating, videoContext, commentPrefs) {
     await ensureOffscreenDocument();
     const response = await chrome.runtime.sendMessage({
         target: 'offscreen',
         action: 'generateOnDevice',
         rating,
         videoContext,
-        commentPrefs,
-        options: options || {}
+        commentPrefs
     });
     return response;
 }
@@ -118,8 +117,7 @@ async function handleGenerateComment(request, sender) {
     const storedMode = await getStoredMode();
     const isThanksVariant = request.promptVariant === 'thanks';
     const options = isThanksVariant ? { promptVariant: 'thanks' } : {};
-    // Popup uses saved Comment style prefs. In-page thanks button ignores them
-    // (fixed English / short / positive thank-you).
+    // Popup uses saved Comment style prefs. In-page thanks button ignores them.
     let commentPrefs = normalizeCommentPrefs(null);
     if (!isThanksVariant) {
         try {
@@ -143,14 +141,34 @@ async function handleGenerateComment(request, sender) {
         return { success: false, error: translations.goToYoutube };
     }
 
+    // Under-video button: curated English thank-you templates (no Nano / no scrape).
+    if (isThanksVariant) {
+        try {
+            const result = await generateComment(
+                AI_MODES.ONDEVICE,
+                rating,
+                { title: '', channel: '', description: '' },
+                commentPrefs,
+                options
+            );
+            return {
+                success: true,
+                comment: result.comment,
+                mode: AI_MODES.ONDEVICE,
+                source: AI_MODES.ONDEVICE
+            };
+        } catch (error) {
+            const code = error && error.message ? error.message : 'UNKNOWN';
+            console.error('Thanks comment generation failed:', code);
+            return { success: false, error: mapErrorToMessage(code), errorCode: code, mode };
+        }
+    }
+
     let videoContext = { title: '', channel: '', description: '' };
     if (mode === AI_MODES.ONDEVICE) {
-        // Thanks variant does not need video details; skip scrape when possible.
-        if (!isThanksVariant) {
-            videoContext = await fetchVideoContext(tab.id);
-            if (!videoContext.title && tab.title) {
-                videoContext.title = String(tab.title).replace(/ - YouTube$/i, '').trim();
-            }
+        videoContext = await fetchVideoContext(tab.id);
+        if (!videoContext.title && tab.title) {
+            videoContext.title = String(tab.title).replace(/ - YouTube$/i, '').trim();
         }
 
         try {
@@ -158,8 +176,7 @@ async function handleGenerateComment(request, sender) {
             const offscreenResult = await generateOnDeviceViaOffscreen(
                 rating,
                 videoContext,
-                commentPrefs,
-                options
+                commentPrefs
             );
             if (offscreenResult && offscreenResult.success && offscreenResult.comment) {
                 return {
@@ -180,13 +197,7 @@ async function handleGenerateComment(request, sender) {
         } catch (error) {
             console.error('Offscreen on-device path failed, trying service worker:', error);
             try {
-                const result = await generateComment(
-                    mode,
-                    rating,
-                    videoContext,
-                    commentPrefs,
-                    options
-                );
+                const result = await generateComment(mode, rating, videoContext, commentPrefs);
                 return {
                     success: true,
                     comment: result.comment,
@@ -202,13 +213,7 @@ async function handleGenerateComment(request, sender) {
     }
 
     try {
-        const result = await generateComment(
-            mode,
-            rating,
-            videoContext,
-            commentPrefs,
-            options
-        );
+        const result = await generateComment(mode, rating, videoContext, commentPrefs);
         return {
             success: true,
             comment: result.comment,

@@ -7,13 +7,37 @@ document.addEventListener('DOMContentLoaded', () => {
     const modeButtons = document.querySelectorAll('.mode-btn');
     const modeTemplateBtn = document.getElementById('modeTemplate');
     const modeOnDeviceBtn = document.getElementById('modeOnDevice');
+    const languageSelect = document.getElementById('commentLanguage');
+    const toneSelect = document.getElementById('commentTone');
+    const lengthButtons = document.querySelectorAll('#commentLength .pref-btn');
+    const commentSettingsEl = document.getElementById('commentSettings');
 
     let rating = 0;
     let generationMode = 'template';
     let userChangedMode = false;
+    let commentPrefs = normalizeCommentPrefs(
+        typeof DEFAULT_COMMENT_PREFS !== 'undefined' ? DEFAULT_COMMENT_PREFS : null
+    );
 
     if (modeTemplateBtn) modeTemplateBtn.textContent = translations.modeTemplate;
     if (modeOnDeviceBtn) modeOnDeviceBtn.textContent = translations.modeOnDevice;
+
+    const settingsTitle = document.querySelector('[data-i18n="commentSettingsTitle"]');
+    if (settingsTitle) {
+        settingsTitle.textContent = translations.commentSettingsTitle || 'Comment style';
+    }
+    const languageLabel = document.querySelector('[data-i18n="languageLabel"]');
+    if (languageLabel) {
+        languageLabel.textContent = translations.languageLabel || 'Language';
+    }
+    const lengthLabel = document.querySelector('[data-i18n="lengthLabel"]');
+    if (lengthLabel) {
+        lengthLabel.textContent = translations.lengthLabel || 'Length';
+    }
+    const toneLabelEl = document.querySelector('[data-i18n="toneLabel"]');
+    if (toneLabelEl) {
+        toneLabelEl.textContent = translations.toneLabel || 'Tone';
+    }
 
     const aboutLink = document.getElementById('aboutLink');
     if (aboutLink) {
@@ -28,6 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    initCommentSettingsControls();
     const settingsReady = loadSettings();
 
     modeButtons.forEach((btn) => {
@@ -35,7 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
             userChangedMode = true;
             generationMode = btn.dataset.mode === 'ondevice' ? 'ondevice' : 'template';
             updateModeButtons();
-            updateAiStatusVisibility();
+            updateModeDependentUi();
             try {
                 await chrome.storage.sync.set({ generationMode });
             } catch (error) {
@@ -114,7 +139,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log('Gemini Nano video title:', videoContext.title || '(missing)');
             }
 
-            const result = await generateComment(generationMode, rating, videoContext);
+            const result = await generateComment(
+                generationMode,
+                rating,
+                videoContext,
+                commentPrefs
+            );
             hideLoading();
             generateButton.disabled = false;
 
@@ -135,21 +165,129 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    function initCommentSettingsControls() {
+        const languages =
+            typeof COMMENT_LANGUAGES !== 'undefined'
+                ? COMMENT_LANGUAGES
+                : ['auto', 'Persian', 'English'];
+        const tones =
+            typeof COMMENT_TONES !== 'undefined'
+                ? COMMENT_TONES
+                : ['casual', 'friendly', 'formal'];
+
+        if (languageSelect) {
+            languageSelect.innerHTML = '';
+            languages.forEach((lang) => {
+                const option = document.createElement('option');
+                option.value = lang;
+                option.textContent =
+                    lang === 'auto'
+                        ? translations.languageAuto || 'Follow video title'
+                        : lang;
+                languageSelect.appendChild(option);
+            });
+            languageSelect.addEventListener('change', async () => {
+                commentPrefs = normalizeCommentPrefs({
+                    ...commentPrefs,
+                    language: languageSelect.value
+                });
+                await saveCommentPrefs();
+            });
+        }
+
+        if (toneSelect) {
+            toneSelect.innerHTML = '';
+            tones.forEach((tone) => {
+                const option = document.createElement('option');
+                option.value = tone;
+                option.textContent = toneLabel(tone);
+                toneSelect.appendChild(option);
+            });
+            toneSelect.addEventListener('change', async () => {
+                commentPrefs = normalizeCommentPrefs({
+                    ...commentPrefs,
+                    tone: toneSelect.value
+                });
+                await saveCommentPrefs();
+            });
+        }
+
+        const lengthShort = document.getElementById('lengthShort');
+        const lengthMedium = document.getElementById('lengthMedium');
+        const lengthLong = document.getElementById('lengthLong');
+        if (lengthShort) lengthShort.textContent = translations.lengthShort || 'Short';
+        if (lengthMedium) lengthMedium.textContent = translations.lengthMedium || 'Medium';
+        if (lengthLong) lengthLong.textContent = translations.lengthLong || 'Long';
+
+        lengthButtons.forEach((btn) => {
+            btn.addEventListener('click', async () => {
+                commentPrefs = normalizeCommentPrefs({
+                    ...commentPrefs,
+                    length: btn.dataset.length
+                });
+                updateLengthButtons();
+                await saveCommentPrefs();
+            });
+        });
+
+        applyCommentPrefsToUi();
+    }
+
+    function toneLabel(tone) {
+        const map = {
+            casual: translations.toneCasual,
+            friendly: translations.toneFriendly,
+            formal: translations.toneFormal,
+            enthusiastic: translations.toneEnthusiastic,
+            constructive: translations.toneConstructive,
+            humorous: translations.toneHumorous,
+            professional: translations.toneProfessional
+        };
+        return map[tone] || tone;
+    }
+
     async function loadSettings() {
         try {
-            const data = await chrome.storage.sync.get(['generationMode']);
+            const data = await chrome.storage.sync.get(['generationMode', 'commentPrefs']);
             if (!userChangedMode) {
                 generationMode = data.generationMode === 'ondevice' ? 'ondevice' : 'template';
             }
+            commentPrefs = normalizeCommentPrefs(data.commentPrefs);
         } catch (error) {
             console.error('Failed to load settings:', error);
             if (!userChangedMode) {
                 generationMode = 'template';
             }
+            commentPrefs = normalizeCommentPrefs(null);
         }
         updateModeButtons();
-        updateAiStatusVisibility();
+        updateModeDependentUi();
+        applyCommentPrefsToUi();
         refreshAiStatus();
+    }
+
+    async function saveCommentPrefs() {
+        try {
+            await chrome.storage.sync.set({ commentPrefs });
+        } catch (error) {
+            console.error('Failed to save comment prefs:', error);
+        }
+    }
+
+    function applyCommentPrefsToUi() {
+        if (languageSelect) {
+            languageSelect.value = commentPrefs.language;
+        }
+        if (toneSelect) {
+            toneSelect.value = commentPrefs.tone;
+        }
+        updateLengthButtons();
+    }
+
+    function updateLengthButtons() {
+        lengthButtons.forEach((btn) => {
+            btn.classList.toggle('active', btn.dataset.length === commentPrefs.length);
+        });
     }
 
     function updateModeButtons() {
@@ -158,11 +296,16 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function updateAiStatusVisibility() {
-        if (generationMode === 'ondevice') {
-            aiStatusEl.style.display = 'block';
-        } else {
-            aiStatusEl.style.display = 'none';
+    function updateModeDependentUi() {
+        const isOnDevice = generationMode === 'ondevice';
+        if (aiStatusEl) {
+            aiStatusEl.style.display = isOnDevice ? 'block' : 'none';
+        }
+        if (commentSettingsEl) {
+            commentSettingsEl.hidden = !isOnDevice;
+            if (!isOnDevice) {
+                commentSettingsEl.open = false;
+            }
         }
     }
 

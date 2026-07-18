@@ -18,6 +18,131 @@ const RATING_LABELS = {
     5: 'very positive / excellent'
 };
 
+const COMMENT_LANGUAGES = [
+    'auto',
+    'Persian',
+    'English',
+    'Arabic',
+    'Turkish',
+    'Spanish',
+    'French',
+    'German',
+    'Portuguese',
+    'Russian',
+    'Chinese',
+    'Japanese',
+    'Korean',
+    'Hindi',
+    'Italian'
+];
+
+const COMMENT_LENGTHS = ['short', 'medium', 'long'];
+
+const COMMENT_TONES = [
+    'casual',
+    'friendly',
+    'formal',
+    'enthusiastic',
+    'constructive',
+    'humorous',
+    'professional'
+];
+
+const DEFAULT_COMMENT_PREFS = {
+    language: 'auto',
+    length: 'short',
+    tone: 'casual'
+};
+
+const LENGTH_INSTRUCTIONS = {
+    short: 'Length: about 5 words total. Keep it very brief — roughly five words, not a full sentence if possible.',
+    medium: 'Length: about 10 words total. Aim for roughly ten words; do not go much longer.',
+    long: 'Length: about 20 words total. Aim for roughly twenty words; do not write a long paragraph.'
+};
+
+const TONE_INSTRUCTIONS = {
+    casual: {
+        en: 'Tone: conversational and informal — like a real viewer chatting under a video, NOT formal, stiff, or academic. Avoid corporate, marketing, or essay-like language. Everyday spoken style is required.',
+        fa: 'Tone: خیلی محاوره‌ای و خودمونی بنویس؛ رسمی، ادبی یا کتابی نباشد. مثل حرف زدن معمولی مردم در کامنت یوتیوب.'
+    },
+    friendly: {
+        en: 'Tone: warm and friendly — supportive and kind, like chatting with a buddy. Stay natural, not overly sweet or fake.',
+        fa: 'Tone: گرم و دوستانه بنویس؛ حمایت‌کننده و مهربان، مثل حرف با یک دوست. تصنعی یا بیش از حد شیرین نباشد.'
+    },
+    formal: {
+        en: 'Tone: polite and formal — clear, respectful wording. Avoid slang and overly casual phrases.',
+        fa: 'Tone: رسمی و مؤدبانه بنویس؛ واضح و محترمانه. از اصطلاحات خیلی خودمونی پرهیز کن.'
+    },
+    enthusiastic: {
+        en: 'Tone: enthusiastic and energetic — excited about the topic, but still sound like a real person (not spammy hype).',
+        fa: 'Tone: پرانرژی و مشتاق بنویس؛ هیجان‌زده نسبت به موضوع، ولی مثل آدم واقعی — نه تبلیغاتی و اغراق‌آمیز.'
+    },
+    constructive: {
+        en: 'Tone: thoughtful and constructive — share a clear opinion or takeaway. Be honest but respectful, not mean.',
+        fa: 'Tone: متفکرانه و سازنده بنویس؛ نظر یا نکته‌ای واضح بگو. صادق باش ولی محترم — تند و توهین‌آمیز نباشد.'
+    },
+    humorous: {
+        en: 'Tone: light and humorous — a witty or playful touch is welcome. Keep it light; no mean jokes or sarcasm that insults.',
+        fa: 'Tone: شوخ‌طبع و سبک بنویس؛ کمی بامزه یا بازیگوش باشد. سبک نگه دار؛ شوخی تند یا توهین‌آمیز ننویس.'
+    },
+    professional: {
+        en: 'Tone: professional and polished — concise, credible, and composed. No slang, memes, or overly casual filler.',
+        fa: 'Tone: حرفه‌ای و مرتب بنویس؛ مختصر، معتبر و سنجیده. بدون اسلنگ، میم یا پرحرفی خودمونی.'
+    }
+};
+
+/**
+ * Normalize stored prefs; unknown values fall back to defaults.
+ * @param {unknown} raw
+ * @returns {{ language: string, length: string, tone: string }}
+ */
+function normalizeCommentPrefs(raw) {
+    const prefs = raw && typeof raw === 'object' ? raw : {};
+    const language = COMMENT_LANGUAGES.includes(prefs.language)
+        ? prefs.language
+        : DEFAULT_COMMENT_PREFS.language;
+    const length = COMMENT_LENGTHS.includes(prefs.length)
+        ? prefs.length
+        : DEFAULT_COMMENT_PREFS.length;
+    const tone = COMMENT_TONES.includes(prefs.tone)
+        ? prefs.tone
+        : DEFAULT_COMMENT_PREFS.tone;
+    return { language, length, tone };
+}
+
+/**
+ * @param {string} title
+ * @param {{ language?: string }} prefs
+ * @returns {string}
+ */
+function resolveCommentLanguage(title, prefs) {
+    const normalized = normalizeCommentPrefs(prefs);
+    if (normalized.language === 'auto') {
+        return detectCommentLanguageFromTitle(title);
+    }
+    return normalized.language;
+}
+
+/**
+ * @param {string} languageName
+ * @param {string} tone
+ * @returns {string}
+ */
+function getToneInstruction(languageName, tone) {
+    const key = COMMENT_TONES.includes(tone) ? tone : DEFAULT_COMMENT_PREFS.tone;
+    const entry = TONE_INSTRUCTIONS[key] || TONE_INSTRUCTIONS.casual;
+    return languageName === 'Persian' ? entry.fa : entry.en;
+}
+
+/**
+ * @param {string} length
+ * @returns {string}
+ */
+function getLengthInstruction(length) {
+    const key = COMMENT_LENGTHS.includes(length) ? length : DEFAULT_COMMENT_PREFS.length;
+    return LENGTH_INSTRUCTIONS[key] || LENGTH_INSTRUCTIONS.short;
+}
+
 /**
  * Detect comment language from the video title script/characters.
  * Returns a human language name for the prompt (not passed into LanguageModel options).
@@ -132,39 +257,62 @@ function detectPersianOrArabic(text) {
     return 'Persian';
 }
 
-function buildCommentPrompt(rating, videoContext) {
+function buildCommentPrompt(rating, videoContext, prefs) {
     const context = videoContext || {};
     const title = (context.title || '').trim();
     const description = (context.description || '').trim();
-    const languageName = detectCommentLanguageFromTitle(title);
+    const commentPrefs = normalizeCommentPrefs(prefs);
+    const languageName = resolveCommentLanguage(title, commentPrefs);
+    const toneLine = getToneInstruction(languageName, commentPrefs.tone);
+    const lengthLine = getLengthInstruction(commentPrefs.length);
+    const lengthAdjective =
+        commentPrefs.length === 'long'
+            ? 'roughly 20-word'
+            : commentPrefs.length === 'medium'
+              ? 'roughly 10-word'
+              : 'roughly 5-word';
 
     if (!title) {
+        const fallbackLanguage =
+            commentPrefs.language === 'auto' ? 'English' : languageName;
         return [
-            'Write a short, casual YouTube comment in English only.',
+            `Write a ${lengthAdjective} YouTube comment in ${fallbackLanguage} only.`,
+            `CRITICAL LANGUAGE: Write the ENTIRE comment in ${fallbackLanguage}.`,
+            fallbackLanguage === 'Persian'
+                ? 'Use Persian (Farsi) script and wording — NOT Arabic.'
+                : '',
+            fallbackLanguage === 'Persian'
+                ? 'Do NOT write in Arabic. The comment must be Persian/Farsi.'
+                : '',
             `The viewer rated this video ${rating}/5 stars (${RATING_LABELS[rating] || 'unknown'}).`,
-            'Tone: conversational and informal — like a normal viewer chatting, NOT formal or academic.',
-            'Avoid stiff or overly polite wording. Everyday spoken language is best.',
+            toneLine,
+            lengthLine,
             'Do NOT mention any person\'s name or channel name.',
             'Keep it a general comment about the video content.',
+            'Match the emotional tone to the star rating while keeping the chosen style.',
             'Do not use hashtag spam. Do not wrap the comment in quotes.',
             'Return ONLY the comment text.'
-        ].join('\n');
+        ].filter(Boolean).join('\n');
     }
 
+    const languageSource =
+        commentPrefs.language === 'auto'
+            ? `The video title language appears to be ${languageName}. Match that language exactly.`
+            : `The user selected ${languageName} as the comment language. Write only in that language.`;
+
     return [
-        'Write a short, casual YouTube comment.',
+        `Write a ${lengthAdjective} YouTube comment.`,
         `CRITICAL LANGUAGE: Write the ENTIRE comment in ${languageName}.`,
         languageName === 'Persian'
             ? 'Use Persian (Farsi) script and wording — NOT Arabic.'
-            : `The video title language appears to be ${languageName}. Match that language exactly.`,
-        'Do not translate into English unless the title language is English.',
+            : languageSource,
+        languageName === 'English'
+            ? ''
+            : 'Do not translate into English unless the required language is English.',
         languageName === 'Persian'
             ? 'Do NOT write in Arabic. The comment must be Persian/Farsi.'
             : '',
-        languageName === 'Persian'
-            ? 'Tone: خیلی محاوره‌ای و خودمونی بنویس؛ رسمی، ادبی یا کتابی نباشد. مثل حرف زدن معمولی مردم در کامنت یوتیوب.'
-            : 'Tone: conversational and informal — like a real viewer chatting under a video, NOT formal, stiff, or academic.',
-        'Avoid corporate, marketing, or essay-like language. Everyday spoken style is required.',
+        toneLine,
         `The viewer rated this video ${rating}/5 stars (${RATING_LABELS[rating] || 'unknown'}).`,
         'CRITICAL TOPIC: Comment on the general topic of this video, based on its title.',
         `Video title: "${title}"`,
@@ -174,8 +322,8 @@ function buildCommentPrompt(rating, videoContext) {
         'Do NOT address anyone by name (no "@", no greetings with names).',
         'Even if the title contains a person\'s name, do not repeat it — paraphrase the topic instead.',
         'Keep it a general viewer comment about the content only.',
-        'Match the tone to the star rating, but stay casual either way.',
-        '1 or 2 short sentences max.',
+        'Match the emotional tone to the star rating while keeping the chosen style.',
+        lengthLine,
         'Do not use hashtag spam. Do not wrap the comment in quotes.',
         'Return ONLY the comment text — no preamble, no explanation.'
     ].filter(Boolean).join('\n');
@@ -263,8 +411,9 @@ async function createLanguageModelSession() {
     }
 }
 
-async function generateOnDeviceComment(rating, videoContext) {
+async function generateOnDeviceComment(rating, videoContext, prefs) {
     const safeRating = Math.min(5, Math.max(1, Number(rating) || 1));
+    const commentPrefs = normalizeCommentPrefs(prefs);
 
     try {
         if (typeof LanguageModel === 'undefined') {
@@ -288,11 +437,15 @@ async function generateOnDeviceComment(rating, videoContext) {
         const session = await createLanguageModelSession();
 
         try {
-            const prompt = buildCommentPrompt(safeRating, videoContext);
+            const prompt = buildCommentPrompt(safeRating, videoContext, commentPrefs);
             const title = (videoContext && videoContext.title) || '';
             console.log(
                 'Gemini Nano prompt language:',
-                detectCommentLanguageFromTitle(title),
+                resolveCommentLanguage(title, commentPrefs),
+                '| prefs:',
+                commentPrefs.language,
+                commentPrefs.length,
+                commentPrefs.tone,
                 '| title:',
                 title.slice(0, 80) || '(missing)'
             );
@@ -323,13 +476,14 @@ async function generateOnDeviceComment(rating, videoContext) {
  * @param {'template'|'ondevice'} mode
  * @param {number} rating
  * @param {{ title?: string, channel?: string, description?: string }} videoContext
+ * @param {{ language?: string, length?: string, tone?: string }} [prefs]
  */
-async function generateComment(mode, rating, videoContext) {
+async function generateComment(mode, rating, videoContext, prefs) {
     const safeRating = Math.min(5, Math.max(1, Number(rating) || 1));
     const normalizedMode = String(mode || '').trim().toLowerCase();
 
     if (normalizedMode === AI_MODES.ONDEVICE) {
-        const comment = await generateOnDeviceComment(safeRating, videoContext);
+        const comment = await generateOnDeviceComment(safeRating, videoContext, prefs);
         return { comment, source: AI_MODES.ONDEVICE };
     }
 

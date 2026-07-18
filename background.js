@@ -12,6 +12,16 @@ async function getStoredMode() {
     }
 }
 
+async function getCommentPrefs() {
+    try {
+        const data = await chrome.storage.sync.get(['commentPrefs']);
+        return normalizeCommentPrefs(data.commentPrefs);
+    } catch (error) {
+        console.error('Failed to read comment prefs:', error);
+        return normalizeCommentPrefs(null);
+    }
+}
+
 async function getActiveYouTubeTab() {
     try {
         const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -90,13 +100,14 @@ async function ensureOffscreenDocument() {
     });
 }
 
-async function generateOnDeviceViaOffscreen(rating, videoContext) {
+async function generateOnDeviceViaOffscreen(rating, videoContext, commentPrefs) {
     await ensureOffscreenDocument();
     const response = await chrome.runtime.sendMessage({
         target: 'offscreen',
         action: 'generateOnDevice',
         rating,
-        videoContext
+        videoContext,
+        commentPrefs
     });
     return response;
 }
@@ -104,6 +115,7 @@ async function generateOnDeviceViaOffscreen(rating, videoContext) {
 async function handleGenerateComment(request, sender) {
     const rating = request.rating;
     const storedMode = await getStoredMode();
+    const commentPrefs = await getCommentPrefs();
     // In-page button can force AI with request.mode === 'ondevice'
     const mode = request.mode || storedMode;
 
@@ -125,7 +137,11 @@ async function handleGenerateComment(request, sender) {
 
         try {
             // Prefer offscreen page — LanguageModel is more reliable there than in the SW.
-            const offscreenResult = await generateOnDeviceViaOffscreen(rating, videoContext);
+            const offscreenResult = await generateOnDeviceViaOffscreen(
+                rating,
+                videoContext,
+                commentPrefs
+            );
             if (offscreenResult && offscreenResult.success && offscreenResult.comment) {
                 return {
                     success: true,
@@ -145,7 +161,7 @@ async function handleGenerateComment(request, sender) {
         } catch (error) {
             console.error('Offscreen on-device path failed, trying service worker:', error);
             try {
-                const result = await generateComment(mode, rating, videoContext);
+                const result = await generateComment(mode, rating, videoContext, commentPrefs);
                 return {
                     success: true,
                     comment: result.comment,
@@ -161,7 +177,7 @@ async function handleGenerateComment(request, sender) {
     }
 
     try {
-        const result = await generateComment(mode, rating, videoContext);
+        const result = await generateComment(mode, rating, videoContext, commentPrefs);
         return {
             success: true,
             comment: result.comment,

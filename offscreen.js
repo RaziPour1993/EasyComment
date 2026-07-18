@@ -4,7 +4,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 
     if (request.action === 'generateOnDevice') {
-        generateOnDeviceComment(request.rating, request.videoContext || {})
+        generateOnDeviceComment(
+            request.rating,
+            request.videoContext || {},
+            request.commentPrefs
+        )
             .then((comment) => {
                 sendResponse({ success: true, comment, source: 'ondevice' });
             })

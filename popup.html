@@ -36,7 +36,7 @@
         }
 
         body {
-            width: 300px;
+            width: 320px;
             padding: 15px;
             font-family: Arial, sans-serif;
             background: var(--bg-color);
@@ -112,6 +112,98 @@
         }
 
         .mode-switch button.mode-btn.active {
+            background: linear-gradient(135deg, #2196F3, #1976D2);
+            color: #fff;
+        }
+
+        .comment-settings {
+            background: var(--rating-bg);
+            border-radius: 8px;
+            padding: 8px 10px;
+        }
+
+        .comment-settings summary {
+            cursor: pointer;
+            font-weight: bold;
+            color: var(--primary-color);
+            font-size: 14px;
+            list-style: none;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            user-select: none;
+        }
+
+        .comment-settings summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .comment-settings summary::after {
+            content: '▾';
+            font-size: 12px;
+            color: var(--muted-color);
+            transition: transform 0.2s ease;
+        }
+
+        .comment-settings[open] summary::after {
+            transform: rotate(180deg);
+        }
+
+        .comment-settings-body {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 10px;
+            padding-top: 8px;
+            border-top: 1px solid rgba(128, 128, 128, 0.25);
+        }
+
+        .pref-field {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .pref-field label {
+            font-size: 12px;
+        }
+
+        .pref-field select {
+            width: 100%;
+            padding: 8px 10px;
+            border-radius: 8px;
+            border: 1px solid rgba(128, 128, 128, 0.35);
+            background: var(--bg-color);
+            color: var(--text-color);
+            font-size: 13px;
+        }
+
+        .pref-switch {
+            display: flex;
+            gap: 4px;
+            background: var(--bg-color);
+            padding: 4px;
+            border-radius: 8px;
+        }
+
+        .pref-switch button.pref-btn {
+            flex: 1;
+            padding: 7px 4px;
+            font-size: 11px;
+            background: transparent;
+            color: var(--text-color);
+            box-shadow: none;
+            text-shadow: none;
+            border: 1px solid transparent;
+            width: auto;
+        }
+
+        .pref-switch button.pref-btn:hover {
+            transform: none;
+            background: rgba(33, 150, 243, 0.15);
+        }
+
+        .pref-switch button.pref-btn.active {
             background: linear-gradient(135deg, #2196F3, #1976D2);
             color: #fff;
         }
@@ -305,6 +397,30 @@
             </div>
             <div class="ai-status" id="aiStatus"></div>
         </div>
+
+        <details class="comment-settings" id="commentSettings" hidden>
+            <summary data-i18n="commentSettingsTitle">Comment style</summary>
+            <div class="comment-settings-body">
+                <div class="pref-field">
+                    <label for="commentLanguage" data-i18n="languageLabel">Language</label>
+                    <select id="commentLanguage" aria-label="Comment language"></select>
+                </div>
+
+                <div class="pref-field">
+                    <label data-i18n="lengthLabel">Length</label>
+                    <div class="pref-switch" id="commentLength" role="group" aria-label="Comment length">
+                        <button type="button" class="pref-btn active" data-length="short" id="lengthShort">Short</button>
+                        <button type="button" class="pref-btn" data-length="medium" id="lengthMedium">Medium</button>
+                        <button type="button" class="pref-btn" data-length="long" id="lengthLong">Long</button>
+                    </div>
+                </div>
+
+                <div class="pref-field">
+                    <label for="commentTone" data-i18n="toneLabel">Tone</label>
+                    <select id="commentTone" aria-label="Comment tone"></select>
+                </div>
+            </div>
+        </details>
 
         <div class="rating-container">
             <label data-i18n="ratingLabel">Your Rating</label>

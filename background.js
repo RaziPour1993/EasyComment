@@ -115,7 +115,10 @@ async function generateOnDeviceViaOffscreen(rating, videoContext, commentPrefs) 
 async function handleGenerateComment(request, sender) {
     const rating = request.rating;
     const storedMode = await getStoredMode();
-    const commentPrefs = await getCommentPrefs();
+    // Prefer prefs sent by the caller (e.g. in-page button); fall back to storage.
+    const commentPrefs = normalizeCommentPrefs(
+        request.commentPrefs != null ? request.commentPrefs : await getCommentPrefs()
+    );
     // In-page button can force AI with request.mode === 'ondevice'
     const mode = request.mode || storedMode;
 

@@ -73,10 +73,19 @@ function createEasyCommentButton() {
         let failed = false;
 
         try {
+            let commentPrefs = null;
+            try {
+                const stored = await chrome.storage.sync.get(['commentPrefs']);
+                commentPrefs = stored.commentPrefs || null;
+            } catch (storageError) {
+                console.error('Failed to read comment prefs for in-page button:', storageError);
+            }
+
             const response = await chrome.runtime.sendMessage({
                 action: 'generateComment',
                 rating: 5,
-                mode: 'ondevice'
+                mode: 'ondevice',
+                commentPrefs
             });
 
             if (!response || !response.success || !response.comment) {

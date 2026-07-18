@@ -115,10 +115,17 @@ async function generateOnDeviceViaOffscreen(rating, videoContext, commentPrefs) 
 async function handleGenerateComment(request, sender) {
     const rating = request.rating;
     const storedMode = await getStoredMode();
-    // Prefer prefs sent by the caller (e.g. in-page button); fall back to storage.
-    const commentPrefs = normalizeCommentPrefs(
-        request.commentPrefs != null ? request.commentPrefs : await getCommentPrefs()
-    );
+    // Always use the user's saved Comment style (language, length, tone) from storage.
+    // Caller-provided prefs are only a fallback if storage is unavailable.
+    let commentPrefs;
+    try {
+        commentPrefs = await getCommentPrefs();
+    } catch (prefsError) {
+        console.error('Failed to load comment prefs from storage:', prefsError);
+        commentPrefs = normalizeCommentPrefs(
+            request.commentPrefs != null ? request.commentPrefs : null
+        );
+    }
     // In-page button can force AI with request.mode === 'ondevice'
     const mode = request.mode || storedMode;
 

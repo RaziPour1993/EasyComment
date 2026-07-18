@@ -253,6 +253,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 generationMode = data.generationMode === 'ondevice' ? 'ondevice' : 'template';
             }
             commentPrefs = normalizeCommentPrefs(data.commentPrefs);
+            // Persist normalized prefs so the in-page button always finds them in storage.
+            if (!data.commentPrefs) {
+                await saveCommentPrefs();
+            }
         } catch (error) {
             console.error('Failed to load settings:', error);
             if (!userChangedMode) {
@@ -301,11 +305,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (aiStatusEl) {
             aiStatusEl.style.display = isOnDevice ? 'block' : 'none';
         }
+        // Keep Comment style visible always — the under-video button uses these
+        // prefs (language, length, tone) even when popup mode is Local.
         if (commentSettingsEl) {
-            commentSettingsEl.hidden = !isOnDevice;
-            if (!isOnDevice) {
-                commentSettingsEl.open = false;
-            }
+            commentSettingsEl.hidden = false;
         }
     }
 

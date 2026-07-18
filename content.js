@@ -73,19 +73,12 @@ function createEasyCommentButton() {
         let failed = false;
 
         try {
-            let commentPrefs = null;
-            try {
-                const stored = await chrome.storage.sync.get(['commentPrefs']);
-                commentPrefs = stored.commentPrefs || null;
-            } catch (storageError) {
-                console.error('Failed to read comment prefs for in-page button:', storageError);
-            }
-
+            // Background loads language / length / tone from chrome.storage.sync
+            // (same Comment style settings the user set in the extension popup).
             const response = await chrome.runtime.sendMessage({
                 action: 'generateComment',
                 rating: 5,
-                mode: 'ondevice',
-                commentPrefs
+                mode: 'ondevice'
             });
 
             if (!response || !response.success || !response.comment) {

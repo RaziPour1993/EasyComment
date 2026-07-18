@@ -73,12 +73,12 @@ function createEasyCommentButton() {
         let failed = false;
 
         try {
-            // Background loads language / length / tone from chrome.storage.sync
-            // (same Comment style settings the user set in the extension popup).
+            // Fixed style for under-video button: English, short, positive thank-you, general.
             const response = await chrome.runtime.sendMessage({
                 action: 'generateComment',
                 rating: 5,
-                mode: 'ondevice'
+                mode: 'ondevice',
+                promptVariant: 'thanks'
             });
 
             if (!response || !response.success || !response.comment) {

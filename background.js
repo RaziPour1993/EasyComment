@@ -100,14 +100,15 @@ async function ensureOffscreenDocument() {
     });
 }
 
-async function generateOnDeviceViaOffscreen(rating, videoContext, commentPrefs) {
+async function generateOnDeviceViaOffscreen(rating, videoContext, commentPrefs, options) {
     await ensureOffscreenDocument();
     const response = await chrome.runtime.sendMessage({
         target: 'offscreen',
         action: 'generateOnDevice',
         rating,
         videoContext,
-        commentPrefs
+        commentPrefs,
+        options: options || {}
     });
     return response;
 }
@@ -115,16 +116,20 @@ async function generateOnDeviceViaOffscreen(rating, videoContext, commentPrefs) 
 async function handleGenerateComment(request, sender) {
     const rating = request.rating;
     const storedMode = await getStoredMode();
-    // Always use the user's saved Comment style (language, length, tone) from storage.
-    // Caller-provided prefs are only a fallback if storage is unavailable.
-    let commentPrefs;
-    try {
-        commentPrefs = await getCommentPrefs();
-    } catch (prefsError) {
-        console.error('Failed to load comment prefs from storage:', prefsError);
-        commentPrefs = normalizeCommentPrefs(
-            request.commentPrefs != null ? request.commentPrefs : null
-        );
+    const isThanksVariant = request.promptVariant === 'thanks';
+    const options = isThanksVariant ? { promptVariant: 'thanks' } : {};
+    // Popup uses saved Comment style prefs. In-page thanks button ignores them
+    // (fixed English / short / positive thank-you).
+    let commentPrefs = normalizeCommentPrefs(null);
+    if (!isThanksVariant) {
+        try {
+            commentPrefs = await getCommentPrefs();
+        } catch (prefsError) {
+            console.error('Failed to load comment prefs from storage:', prefsError);
+            commentPrefs = normalizeCommentPrefs(
+                request.commentPrefs != null ? request.commentPrefs : null
+            );
+        }
     }
     // In-page button can force AI with request.mode === 'ondevice'
     const mode = request.mode || storedMode;
@@ -140,9 +145,12 @@ async function handleGenerateComment(request, sender) {
 
     let videoContext = { title: '', channel: '', description: '' };
     if (mode === AI_MODES.ONDEVICE) {
-        videoContext = await fetchVideoContext(tab.id);
-        if (!videoContext.title && tab.title) {
-            videoContext.title = String(tab.title).replace(/ - YouTube$/i, '').trim();
+        // Thanks variant does not need video details; skip scrape when possible.
+        if (!isThanksVariant) {
+            videoContext = await fetchVideoContext(tab.id);
+            if (!videoContext.title && tab.title) {
+                videoContext.title = String(tab.title).replace(/ - YouTube$/i, '').trim();
+            }
         }
 
         try {
@@ -150,7 +158,8 @@ async function handleGenerateComment(request, sender) {
             const offscreenResult = await generateOnDeviceViaOffscreen(
                 rating,
                 videoContext,
-                commentPrefs
+                commentPrefs,
+                options
             );
             if (offscreenResult && offscreenResult.success && offscreenResult.comment) {
                 return {
@@ -171,7 +180,13 @@ async function handleGenerateComment(request, sender) {
         } catch (error) {
             console.error('Offscreen on-device path failed, trying service worker:', error);
             try {
-                const result = await generateComment(mode, rating, videoContext, commentPrefs);
+                const result = await generateComment(
+                    mode,
+                    rating,
+                    videoContext,
+                    commentPrefs,
+                    options
+                );
                 return {
                     success: true,
                     comment: result.comment,
@@ -187,7 +202,13 @@ async function handleGenerateComment(request, sender) {
     }
 
     try {
-        const result = await generateComment(mode, rating, videoContext, commentPrefs);
+        const result = await generateComment(
+            mode,
+            rating,
+            videoContext,
+            commentPrefs,
+            options
+        );
         return {
             success: true,
             comment: result.comment,

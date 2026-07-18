@@ -306,7 +306,47 @@ async function rememberAiComment(comment) {
     }
 }
 
-function buildCommentPrompt(rating, videoContext, prefs, recentComments) {
+function buildUniquenessLines(recentComments) {
+    const variationHint = pickPromptVariationHint();
+    const recent = Array.isArray(recentComments)
+        ? recentComments.filter((item) => typeof item === 'string' && item.trim()).slice(0, 5)
+        : [];
+    return [
+        'CRITICAL UNIQUENESS: Write a brand-new comment. Do NOT reuse the same wording as before.',
+        `Variation hint: ${variationHint}`,
+        `Freshness token: ${Date.now().toString(36)}-${Math.floor(Math.random() * 100000)}`,
+        recent.length > 0
+            ? `Do NOT repeat or closely paraphrase any of these recent comments:\n- ${recent.join('\n- ')}`
+            : ''
+    ];
+}
+
+/**
+ * In-page button: always English, short, positive thank-you, no video details.
+ * @param {string[]} [recentComments]
+ */
+function buildThanksCommentPrompt(recentComments) {
+    return [
+        'Write a roughly 5-word YouTube comment in English only.',
+        'CRITICAL LANGUAGE: Write the ENTIRE comment in English.',
+        'Tone: short, positive, and thankful — like “that was great, thanks” or “thanks, loved it”.',
+        'CRITICAL STYLE: A brief praise + thank-you. Simple and natural.',
+        'CRITICAL: Keep it GENERAL — do NOT mention the video topic, title, subject, facts, or anything specific from the video.',
+        'Do NOT mention any person\'s name, creator name, channel name, or proper names.',
+        'Do NOT address anyone by name (no "@").',
+        'Vibe examples (do not copy verbatim): that was great thanks / thanks that was awesome / loved it thanks / awesome video thanks',
+        'Length: about 5 words total. Keep it very brief.',
+        ...buildUniquenessLines(recentComments),
+        'Do not use hashtag spam. Do not wrap the comment in quotes.',
+        'Return ONLY the comment text — no preamble, no explanation.'
+    ].filter(Boolean).join('\n');
+}
+
+function buildCommentPrompt(rating, videoContext, prefs, recentComments, options) {
+    if (options && options.promptVariant === 'thanks') {
+        return buildThanksCommentPrompt(recentComments);
+    }
+
     const context = videoContext || {};
     const title = (context.title || '').trim();
     const description = (context.description || '').trim();
@@ -320,18 +360,7 @@ function buildCommentPrompt(rating, videoContext, prefs, recentComments) {
             : commentPrefs.length === 'medium'
               ? 'roughly 10-word'
               : 'roughly 5-word';
-    const variationHint = pickPromptVariationHint();
-    const recent = Array.isArray(recentComments)
-        ? recentComments.filter((item) => typeof item === 'string' && item.trim()).slice(0, 5)
-        : [];
-    const uniquenessLines = [
-        'CRITICAL UNIQUENESS: Write a brand-new comment. Do NOT reuse the same wording as before.',
-        `Variation hint: ${variationHint}`,
-        `Freshness token: ${Date.now().toString(36)}-${Math.floor(Math.random() * 100000)}`,
-        recent.length > 0
-            ? `Do NOT repeat or closely paraphrase any of these recent comments:\n- ${recent.join('\n- ')}`
-            : ''
-    ];
+    const uniquenessLines = buildUniquenessLines(recentComments);
 
     if (!title) {
         const fallbackLanguage =
@@ -506,9 +535,11 @@ async function createLanguageModelSession() {
     }
 }
 
-async function generateOnDeviceComment(rating, videoContext, prefs) {
+async function generateOnDeviceComment(rating, videoContext, prefs, options) {
     const safeRating = Math.min(5, Math.max(1, Number(rating) || 1));
     const commentPrefs = normalizeCommentPrefs(prefs);
+    const promptOptions =
+        options && options.promptVariant === 'thanks' ? { promptVariant: 'thanks' } : {};
 
     try {
         if (typeof LanguageModel === 'undefined') {
@@ -537,16 +568,21 @@ async function generateOnDeviceComment(rating, videoContext, prefs) {
                 safeRating,
                 videoContext,
                 commentPrefs,
-                recentComments
+                recentComments,
+                promptOptions
             );
             const title = (videoContext && videoContext.title) || '';
             console.log(
                 'Gemini Nano prompt language:',
-                resolveCommentLanguage(title, commentPrefs),
+                promptOptions.promptVariant === 'thanks'
+                    ? 'English (thanks)'
+                    : resolveCommentLanguage(title, commentPrefs),
                 '| prefs:',
                 commentPrefs.language,
                 commentPrefs.length,
                 commentPrefs.tone,
+                '| variant:',
+                promptOptions.promptVariant || 'default',
                 '| title:',
                 title.slice(0, 80) || '(missing)'
             );
@@ -579,13 +615,19 @@ async function generateOnDeviceComment(rating, videoContext, prefs) {
  * @param {number} rating
  * @param {{ title?: string, channel?: string, description?: string }} videoContext
  * @param {{ language?: string, length?: string, tone?: string }} [prefs]
+ * @param {{ promptVariant?: string }} [options]
  */
-async function generateComment(mode, rating, videoContext, prefs) {
+async function generateComment(mode, rating, videoContext, prefs, options) {
     const safeRating = Math.min(5, Math.max(1, Number(rating) || 1));
     const normalizedMode = String(mode || '').trim().toLowerCase();
 
     if (normalizedMode === AI_MODES.ONDEVICE) {
-        const comment = await generateOnDeviceComment(safeRating, videoContext, prefs);
+        const comment = await generateOnDeviceComment(
+            safeRating,
+            videoContext,
+            prefs,
+            options
+        );
         return { comment, source: AI_MODES.ONDEVICE };
     }
 

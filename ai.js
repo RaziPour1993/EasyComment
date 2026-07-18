@@ -257,7 +257,56 @@ function detectPersianOrArabic(text) {
     return 'Persian';
 }
 
-function buildCommentPrompt(rating, videoContext, prefs) {
+const PROMPT_VARIATION_HINTS = [
+    'Start with a different opening than usual.',
+    'Use slightly different wording than a typical generic comment.',
+    'Focus on a fresh angle — reaction, takeaway, or feeling.',
+    'Prefer a different sentence structure this time.',
+    'Make it sound like another real viewer, not a copy of a previous comment.',
+    'Vary the vocabulary; avoid repeating the same stock phrases.',
+    'Keep the meaning, but change how it is phrased completely.'
+];
+
+function pickPromptVariationHint() {
+    const index = Math.floor(Math.random() * PROMPT_VARIATION_HINTS.length);
+    return PROMPT_VARIATION_HINTS[index];
+}
+
+/**
+ * @returns {Promise<string[]>}
+ */
+async function loadRecentAiComments() {
+    try {
+        if (!chrome?.storage?.session) {
+            return [];
+        }
+        const data = await chrome.storage.session.get(['recentAiComments']);
+        const list = data.recentAiComments;
+        return Array.isArray(list) ? list.filter((item) => typeof item === 'string') : [];
+    } catch (error) {
+        console.error('Failed to load recent AI comments:', error);
+        return [];
+    }
+}
+
+/**
+ * @param {string} comment
+ * @returns {Promise<void>}
+ */
+async function rememberAiComment(comment) {
+    try {
+        if (!chrome?.storage?.session || !comment) {
+            return;
+        }
+        const recent = await loadRecentAiComments();
+        const next = [comment, ...recent.filter((item) => item !== comment)].slice(0, 10);
+        await chrome.storage.session.set({ recentAiComments: next });
+    } catch (error) {
+        console.error('Failed to remember AI comment:', error);
+    }
+}
+
+function buildCommentPrompt(rating, videoContext, prefs, recentComments) {
     const context = videoContext || {};
     const title = (context.title || '').trim();
     const description = (context.description || '').trim();
@@ -271,6 +320,18 @@ function buildCommentPrompt(rating, videoContext, prefs) {
             : commentPrefs.length === 'medium'
               ? 'roughly 10-word'
               : 'roughly 5-word';
+    const variationHint = pickPromptVariationHint();
+    const recent = Array.isArray(recentComments)
+        ? recentComments.filter((item) => typeof item === 'string' && item.trim()).slice(0, 5)
+        : [];
+    const uniquenessLines = [
+        'CRITICAL UNIQUENESS: Write a brand-new comment. Do NOT reuse the same wording as before.',
+        `Variation hint: ${variationHint}`,
+        `Freshness token: ${Date.now().toString(36)}-${Math.floor(Math.random() * 100000)}`,
+        recent.length > 0
+            ? `Do NOT repeat or closely paraphrase any of these recent comments:\n- ${recent.join('\n- ')}`
+            : ''
+    ];
 
     if (!title) {
         const fallbackLanguage =
@@ -287,6 +348,7 @@ function buildCommentPrompt(rating, videoContext, prefs) {
             `The viewer rated this video ${rating}/5 stars (${RATING_LABELS[rating] || 'unknown'}).`,
             toneLine,
             lengthLine,
+            ...uniquenessLines,
             'Do NOT mention any person\'s name or channel name.',
             'Keep it a general comment about the video content.',
             'Match the emotional tone to the star rating while keeping the chosen style.',
@@ -324,6 +386,7 @@ function buildCommentPrompt(rating, videoContext, prefs) {
         'Keep it a general viewer comment about the content only.',
         'Match the emotional tone to the star rating while keeping the chosen style.',
         lengthLine,
+        ...uniquenessLines,
         'Do not use hashtag spam. Do not wrap the comment in quotes.',
         'Return ONLY the comment text — no preamble, no explanation.'
     ].filter(Boolean).join('\n');
@@ -399,15 +462,47 @@ async function createLanguageModelSession() {
         });
     };
 
+    let temperature = 1.4;
+    let topK = 40;
     try {
-        return await LanguageModel.create({
-            monitor,
-            expectedInputs: [{ type: 'text', languages: ['en'] }],
-            expectedOutputs: [{ type: 'text', languages: ['en'] }]
-        });
+        if (typeof LanguageModel.params === 'function') {
+            const params = await LanguageModel.params();
+            const maxTemperature =
+                typeof params.maxTemperature === 'number' ? params.maxTemperature : 2;
+            const maxTopK = typeof params.maxTopK === 'number' ? params.maxTopK : 128;
+            const defaultTemperature =
+                typeof params.defaultTemperature === 'number'
+                    ? params.defaultTemperature
+                    : 1;
+            temperature = Math.min(Math.max(defaultTemperature * 1.4, 1.2), maxTemperature);
+            topK = Math.min(Math.max(40, params.defaultTopK || 3), maxTopK);
+        }
+    } catch (paramsError) {
+        console.error('LanguageModel.params failed, using fallback sampling:', paramsError);
+    }
+
+    const createOptions = {
+        monitor,
+        expectedInputs: [{ type: 'text', languages: ['en'] }],
+        expectedOutputs: [{ type: 'text', languages: ['en'] }],
+        temperature,
+        topK
+    };
+
+    try {
+        return await LanguageModel.create(createOptions);
     } catch (error) {
-        console.error('LanguageModel.create with en options failed, retrying plain create:', error);
-        return LanguageModel.create({ monitor });
+        console.error('LanguageModel.create with sampling options failed, retrying plain create:', error);
+        try {
+            return await LanguageModel.create({
+                monitor,
+                temperature,
+                topK
+            });
+        } catch (samplingError) {
+            console.error('LanguageModel.create with temperature/topK failed:', samplingError);
+            return LanguageModel.create({ monitor });
+        }
     }
 }
 
@@ -435,9 +530,15 @@ async function generateOnDeviceComment(rating, videoContext, prefs) {
         }
 
         const session = await createLanguageModelSession();
+        const recentComments = await loadRecentAiComments();
 
         try {
-            const prompt = buildCommentPrompt(safeRating, videoContext, commentPrefs);
+            const prompt = buildCommentPrompt(
+                safeRating,
+                videoContext,
+                commentPrefs,
+                recentComments
+            );
             const title = (videoContext && videoContext.title) || '';
             console.log(
                 'Gemini Nano prompt language:',
@@ -454,6 +555,7 @@ async function generateOnDeviceComment(rating, videoContext, prefs) {
             if (!comment) {
                 throw new Error('EMPTY_AI_RESPONSE');
             }
+            await rememberAiComment(comment);
             return comment;
         } finally {
             if (session && typeof session.destroy === 'function') {
